@@ -20,6 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <v-container
       fluid
       class="pa-2"
+  <div class="c-analysis" style="width: 100%; height: 100%">
+    <h3>Analysis View</h3>
+    <ViewToolbar :groups="groups" />
+    <ul
+      v-for="job of jobs"
+      :key="job.id"
     >
       <!-- Filters -->
       <v-row no-gutters>
@@ -134,6 +140,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:initial-options="timeseriesPlotOptions"
       />
     </v-container>
+      <li>
+        {{ job.id }}
+        <br />
+        <span style="padding-left: 1em">started: {{ job.startedTime }}</span>
+        <br />
+        <span style="padding-left: 1em">finished: {{ job.finishedTime }}</span>
+      </li>
+    </ul>
   </div>
 </template>
 
@@ -143,8 +157,15 @@ import {
   debounce,
   pick,
 } from 'lodash'
+import pick from 'lodash/pick'
+import Vue from 'vue'
 import gql from 'graphql-tag'
+import pageMixin from '@/mixins/index'
 import graphqlMixin from '@/mixins/graphql'
+import subscriptionViewMixin from '@/mixins/subscriptionView'
+import subscriptionComponentMixin from '@/mixins/subscriptionComponent'
+import SubscriptionQuery from '@/model/SubscriptionQuery.model'
+import ViewToolbar from '@/components/cylc/ViewToolbar'
 import {
   initialOptions,
   updateInitialOptionsEvent,
@@ -163,6 +184,7 @@ import {
   mdiChartTimelineVariant,
   mdiRefresh,
   mdiTable,
+  mdiChartLine
 } from '@mdi/js'
 
 /** List of fields to request for task for each task */
@@ -185,6 +207,12 @@ const taskFields = [
   'minQueueTime',
   'queueQuartiles',
   'maxQueueTime'
+// list of fields to request for jobs
+const jobFields = [
+  'id',
+  'state',
+  'startedTime',
+  'finishedTime'
 ]
 
 /** The one-off query which retrieves historical task timing statistics */
@@ -192,6 +220,47 @@ const TASK_QUERY = gql`
 query analysisTaskQuery ($workflows: [ID]) {
   tasks(live: false, workflows: $workflows) {
     ${taskFields.join('\n')}
+// the one-off query which retrieves historical objects not
+// normally visible in the GUI
+const QUERY = gql`
+query ($workflows: [ID]) {
+  jobs(live: false, workflows: $workflows) {
+    ${jobFields.join('\n')}
+  }
+}
+`
+
+// the subscription which keeps up to date with the live
+// state of the workflow
+const SUBSCRIPTION = gql`
+subscription WorkflowGraphSubscription ($workflowId: ID) {
+  deltas(workflows: [$workflowId]) {
+    ...Deltas
+  }
+}
+
+fragment JobData on Job {
+  ${jobFields.join('\n')}
+}
+
+fragment AddedDelta on Added {
+  jobs {
+    ...JobData
+  }
+}
+
+fragment UpdatedDelta on Updated {
+  jobs {
+    ...JobData
+  }
+}
+
+fragment Deltas on Deltas {
+  added {
+    ...AddedDelta
+  }
+  updated (stripNull: true) {
+    ...UpdatedDelta
   }
 }
 `
@@ -204,6 +273,11 @@ class AnalysisTaskCallback extends DeltasCallback {
   constructor (tasks) {
     super()
     this.tasks = tasks
+// the callback which gets automatically called when data comes in on
+// the subscription
+class AnalysisCallback {
+  constructor (jobs) {
+    this.jobs = jobs
   }
 
   /**
@@ -213,6 +287,26 @@ class AnalysisTaskCallback extends DeltasCallback {
     this.tasks.push(
       ...data.tasks.map((task) => pick(task, taskFields))
     )
+  }
+    // add jobs contained in data to this.jobs
+    for (const job of data.jobs) {
+      if (job.id in this.jobs) {
+        // merge new data into existing entry
+        const storedJob = this.jobs[job.id]
+        for (const field of jobFields) {
+          if (job[field]) {
+            Vue.set(storedJob, field, job[field])
+          }
+        }
+      } else {
+        // add new entry
+        Vue.set(
+          this.jobs,
+          job.id,
+          pick(job, jobFields)
+        )
+      }
+    }
   }
 
   // called when new objects are added
@@ -239,7 +333,13 @@ export default {
 
   mixins: [
     graphqlMixin
+    pageMixin,
+    graphqlMixin,
+    subscriptionComponentMixin,
+    subscriptionViewMixin
   ],
+
+  name: 'Analysis',
 
   components: {
     AnalysisTable,
@@ -289,6 +389,7 @@ export default {
      */
     const timeseriesPlotOptions = useInitialOptions('timeseriesPlotOptions', { props, emit })
 
+  metaInfo () {
     return {
       tasksFilter,
       chartType,
@@ -309,6 +410,18 @@ export default {
   },
 
   computed: {
+    // registers the subscription (unhelpfully named query)
+    // (this is called automatically)
+    query () {
+      this.historicalQuery() // TODO order
+      return new SubscriptionQuery(
+        SUBSCRIPTION,
+        this.variables,
+        'workflow',
+        [this.callback]
+      )
+    },
+
     // a list of the workflow IDs this view is "viewing"
     // NOTE: we plan multi-workflow functionality so we are writing views
     // to be mult-workflow compatible in advance of this feature arriving
@@ -360,5 +473,15 @@ export default {
     { value: 'runTimes', title: 'Run times' },
     { value: 'queueTimes', title: 'Queue times' },
   ],
+    // run the one-off query for historical job data and pass its results
+    // through the callback
+    async historicalQuery () {
+      const ret = await this.$workflowService.query2(
+        QUERY,
+        { workflows: this.workflowIDs }
+      )
+      this.callback.onAdded(ret.data)
+    }
+  }
 }
 </script>

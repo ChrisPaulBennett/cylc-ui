@@ -132,6 +132,16 @@ export default [
     props: true
   },
   {
+    path: '/analysis/:workflowName(.*)',
+    view: 'Analysis',
+    name: 'analysis',
+    meta: {
+      layout: 'default',
+      toolbar: true
+    },
+    props: true
+  },
+  {
     path: '/log/:workflowName(.*)',
     view: 'Log',
     meta: {
