@@ -17,41 +17,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-cy="workspace-view">
-    <Toolbar
-      :views="workflowViews"
+    <toolbar
+      :views="views"
       :workflow-name="workflowName"
-    />
-    <div
-      class="workflow-panel"
-      :style="$options.panelStyle"
-    >
-      <Lumino
+      v-on:add="this.addView"
+      :initialOptions="{}"
+    ></toolbar>
+    <div class="workflow-panel fill-height">
+      <lumino
         ref="lumino"
-        @emptied="onEmptied"
-        :workflow-name="workflowName"
-        :allViews="allViews"
-      />
+        v-on:lumino:deleted="onWidgetDeletedEvent"
+        tab-title-prop="tab-title"
+      >
+        <v-skeleton-loader
+          v-for="(item, id) of widgets"
+          :key="id"
+          :id="id"
+          :loading="isLoading"
+          :tab-title="item.view.data().widget.title"
+          type="list-item-three-line"
+        >
+          <component
+            :is="item.view"
+            :workflow-name="workflowName"
+            :initialOptions="item.initialOptions"
+            class="h-100"
+          />
+        </v-skeleton-loader>
+      </lumino>
     </div>
   </div>
 </template>
 
 <script>
-import { ref } from 'vue'
-import { onBeforeRouteUpdate } from 'vue-router'
-import { allViews, workflowViews } from '@/views/views.js'
+import Vue from 'vue'
+import { each, iter } from '@lumino/algorithm'
+import pageMixin from '@/mixins'
 import graphqlMixin from '@/mixins/graphql'
-import subscriptionMixin from '@/mixins/subscription'
+import subscriptionViewMixin from '@/mixins/subscriptionView'
 import ViewState from '@/model/ViewState.model'
-import Lumino from '@/components/cylc/workspace/Lumino.vue'
-import Toolbar from '@/components/cylc/workspace/Toolbar.vue'
-import { toolbarHeight } from '@/utils/toolbar'
+import { createWidgetId } from '@/components/cylc/workflow/index'
+import Lumino from '@/components/cylc/workflow/Lumino'
+import Toolbar from '@/components/cylc/workflow/Toolbar'
+import TableView from '@/views/Table'
+import TreeView from '@/views/Tree'
+import GraphView from '@/views/Graph'
+import LogView from '@/views/Log'
+import AnalysisView from '@/views/Analysis'
 
 export default {
-  name: 'Workspace',
+  name: 'Workflow',
 
   mixins: [
+    pageMixin,
     graphqlMixin,
-    subscriptionMixin
+    subscriptionViewMixin
   ],
 
   components: {
@@ -59,32 +79,149 @@ export default {
     Toolbar
   },
 
-  setup () {
-    /** Template ref */
-    const lumino = ref(null)
-
-    onBeforeRouteUpdate((to, from) => {
-      lumino.value.changeLayout(to.params.workflowName)
-    })
-
+  metaInfo () {
     return {
-      allViews,
-      workflowViews,
-      lumino,
+      title: this.getPageTitle('App.workflow', { name: this.workflowName })
     }
+  },
+
+  props: {
+    initialOptions: {
+      type: Object,
+      required: false,
+      default: () => {}
+    }
+  },
+
+  data: () => ({
+    /**
+     * The widgets added to the view.
+     *
+     * @type {Object.<String, String>}
+     */
+    widgets: {},
+    /**
+     * A list of Vue views or components. These components must provide a .widget
+     * property/data with the title and icon properties.
+     *
+     * Each view in this list will be available from the Toolbar to be added as
+     * a widget.
+     *
+     * @type {Object[]}
+     */
+    views: [
+      TreeView,
+      TableView,
+      GraphView,
+      LogView
+      AnalysisView
+    ]
+
+  }),
+  created () {
+    // We need to load each view used by this view/component.
+    // See "local-registration" in Vue.js documentation.
+    this.views.forEach(view => {
+      this.$options.components[view.name] = view
+    })
+  },
+
+  computed: {
+  },
+
+  beforeRouteEnter (to, from, next) {
+    next(vm => {
+      vm.$nextTick(() => {
+        vm.addView({ viewName: TreeView.name })
+      })
+    })
+  },
+
+  beforeRouteUpdate (to, from, next) {
+    // clear all widgets
+    this.removeAllWidgets()
+    next()
+    // start over again with the new deltas query/variables/new widget as in beforeRouteEnter
+    // and in the next tick as otherwise we would get stale/old variables for the graphql query
+    this.$nextTick(() => {
+      // Create a Tree View for the current workflow by default
+      this.addView({ viewName: TreeView.name })
+    })
+  },
+
+  beforeRouteLeave (to, from, next) {
+    // clear all widgets
+    this.removeAllWidgets()
+    next()
+  },
+
+  mounted () {
+    this.$eventBus.on('add-view', this.addView)
+  },
+
+  beforeDestroy () {
+    this.$eventBus.off('add-view', this.addView)
   },
 
   methods: {
-    onEmptied () {
+    /**
+     * Add a new view widget.
+     *
+     * @type {String} viewName - the name of the view to be added (Vue component name).
+     */
+    addView ({ viewName, initialOptions = {} }) {
+      const view = this.views
+        .filter(v => v.name === viewName)
+        .slice(0)[0]
+      if (!view) {
+        throw Error(`Unknown view "${viewName}"`)
+      }
+      Vue.set(
+        this.widgets,
+        createWidgetId(),
+        { view, initialOptions }
+      )
+      this.$nextTick(() => {
+        // Views use navigation-guards to start the pending subscriptions. But we don't have
+        // this in this view. We must pretend we are doing the beforeRouteEnter here, and
+        // call the .startSubscriptions function, so that the WorkflowService will take care
+        // of loading the pending subscriptions (like the ones created by the new view).
+        this.$workflowService.startSubscriptions()
+      })
+    },
+    /**
+     * Remove all the widgets present in the UI.
+     */
+    removeAllWidgets () {
+      const dockWidgets = this.$refs.lumino.dock.widgets()
+      const widgets = []
+      each(iter(dockWidgets), widget => {
+        widgets.push(widget)
+      })
+      widgets.forEach(widget => widget.close())
+    },
+    /**
+     * Called for each widget removed. Each widget contains a subscription
+     * attached. This method will check if it needs to cancel the
+     * subscription (e.g. we removed the last widget using a deltas
+     * subscription).
+     *
+     * Calling it might change the value of the `isLoading` data
+     * attribute.
+     *
+     * @param {{
+     *   id: string
+     * }} event UI event containing the widget ID (string value, needs to be parsed)
+     */
+    onWidgetDeletedEvent (event) {
+      Vue.delete(this.widgets, event.id)
       // If we have no more widgets in the view, then we are not loading, not complete, not error,
       // but back to beginning. When a widget is added, if it uses a query, then the mixins will
       // take care to set the state to LOADING and then COMPLETE (and hopefully not ERROR).
-      this.viewState = ViewState.NO_STATE
+      if (Object.entries(this.widgets).length === 0) {
+        this.viewState = ViewState.NO_STATE
+      }
     }
-  },
-
-  panelStyle: {
-    height: `calc(100vh - ${toolbarHeight}px)`,
-  },
+  }
 }
 </script>

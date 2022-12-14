@@ -32,19 +32,19 @@ import {
   query,
   tokenise
 } from '@/utils/aotf'
-import { store } from '@/store/index'
+import store from '@/store/index'
 import { createApolloClient } from '@/graphql/index'
 import { print } from 'graphql'
 import mergeQueries from '@/graphql/merge'
-import { Alert } from '@/model/Alert.model'
+import Alert from '@/model/Alert.model'
 import CylcTreeCallback from '@/services/treeCallback'
 
-/** @typedef {import('graphql').DocumentNode} DocumentNode */
-/** @typedef {import('graphql').IntrospectionInputType} IntrospectionInputType */
-/** @typedef {import('subscriptions-transport-ws').SubscriptionClient} SubscriptionClient */
-/** @typedef {import('@/utils/aotf').Mutation} Mutation */
-/** @typedef {import('@/utils/aotf').MutationResponse} MutationResponse */
-/** @typedef {import('@/utils/aotf').Query} Query */
+// Typedef imports
+/* eslint-disable no-unused-vars, no-duplicate-imports */
+import { Mutation, MutationResponse, Query } from '@/utils/aotf'
+import { DocumentNode, IntrospectionInputType } from 'graphql'
+import { SubscriptionClient } from 'subscriptions-transport-ws'
+/* eslint-enable no-unused-vars, no-duplicate-imports */
 
 /**
  * @typedef {Object} IntrospectionObj
@@ -66,7 +66,7 @@ class WorkflowService {
    * @param {?SubscriptionClient} subscriptionClient
    */
   constructor (httpUrl, subscriptionClient) {
-    this.debug = import.meta.env.MODE !== 'production'
+    this.debug = process.env.NODE_ENV !== 'production'
 
     this.subscriptionClient = subscriptionClient
     this.apolloClient = createApolloClient(httpUrl, subscriptionClient)
@@ -109,17 +109,14 @@ class WorkflowService {
    * @param {string} id
    * @returns {Promise<MutationResponse>}
    */
-  async mutate (mutationName, id, args = {}) {
+  async mutate (mutationName, id) {
     const mutation = await this.getMutation(mutationName)
     return await mutate(
       mutation,
-      {
-        ...getMutationArgsFromTokens(
-          mutation,
-          tokenise(id),
-        ),
-        ...args
-      },
+      getMutationArgsFromTokens(
+        mutation,
+        tokenise(id)
+      ),
       this.apolloClient
     )
   }
@@ -130,6 +127,7 @@ class WorkflowService {
    * @param {string} queryName
    * @param {Object} args
    * @param {Field[]} fields
+   * @param {Object} variables
    * @return {Promise<Object>}
    * @memberof WorkflowService
    */
@@ -142,7 +140,7 @@ class WorkflowService {
     )
   }
 
-  async query2 (query, variables) { // TODO: refactor or come up with better name
+  async query2 (query, variables) { // TODO ???
     const response = await this.apolloClient.query({
       query,
       variables,
@@ -159,19 +157,10 @@ class WorkflowService {
   async loadTypes () {
     // TODO: this assumes all workflows use the same schema which is and
     //       isn't necessarily true, not quite sure, come back to this later.
-    let response
-    try {
-      response = await this.apolloClient.query({
-        query: getIntrospectionQuery(),
-        fetchPolicy: 'no-cache'
-      })
-    } catch (err) {
-      console.error(err)
-      // eslint-disable-next-line no-console
-      console.log('retrying introspection query')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      return this.loadTypes()
-    }
+    const response = await this.apolloClient.query({
+      query: getIntrospectionQuery(),
+      fetchPolicy: 'no-cache'
+    })
     const mutations = response.data.__schema.mutationType.fields
     const queries = response.data.__schema.queryType.fields
     const { types } = response.data.__schema
@@ -215,12 +204,17 @@ class WorkflowService {
   // --- GraphQL query subscriptions
 
   /**
-   * @param {SubscriptionQuery} query
+   * @param {View} componentOrView
    * @returns {Subscription}
    */
-  getOrCreateSubscription (query) {
+  getOrCreateSubscription (componentOrView) {
+    const queryName = componentOrView.query.name
+    let subscription = this.subscriptions[queryName]
     // note, this will force a return of the FIRST query of the SAME name as any subsequent queries
-    return (this.subscriptions[query.name] ??= new Subscription(query))
+    if (!subscription) {
+      subscription = this.subscriptions[queryName] = new Subscription(componentOrView.query)
+    }
+    return subscription
   }
 
   /**
@@ -228,7 +222,7 @@ class WorkflowService {
    */
   subscribe (componentOrView) {
     // First we retrieve the existing, or create a new subscription (and add to the pool).
-    const subscription = this.getOrCreateSubscription(componentOrView.query)
+    const subscription = this.getOrCreateSubscription(componentOrView)
     if (!subscription.subscribers[componentOrView._uid]) {
       // NOTE: make sure to remove it afterwards to avoid memory leaks!
       subscription.subscribers[componentOrView._uid] = componentOrView
@@ -243,6 +237,7 @@ class WorkflowService {
           callback.init(store, errors)
           for (const error of errors) {
             store.commit('SET_ALERT', new Alert(error[0], 'error'), { root: true })
+            // eslint-disable-next-line no-console
             console.warn(...error)
             subscription.handleViewState(ViewState.ERROR, error('Error presetting view state'))
           }
@@ -332,7 +327,6 @@ class WorkflowService {
               const errors = []
 
               // run the global callback first
-              globalCallback.before(deltas, store, errors)
               globalCallback.onAdded(added, store, errors)
               globalCallback.onUpdated(updated, store, errors)
               globalCallback.onPruned(pruned, store, errors)
@@ -358,6 +352,7 @@ class WorkflowService {
                   new Alert(error[0], 'error'),
                   { root: true }
                 )
+                // eslint-disable-next-line no-console
                 console.warn(...error)
               }
             },
@@ -413,20 +408,15 @@ class WorkflowService {
     })
   }
 
-  /**
-   * Remove subscriber and stop subscription.
-   *
-   * @param {SubscriptionQuery} query - The component/view's subscription query.
-   * @param {string} uid - The unique ID for the component/view.
-   */
-  unsubscribe (query, uid) {
-    const subscription = this.subscriptions[query.name]
+  unsubscribe (componentOrView) {
+    const subscription = this.subscriptions[componentOrView.query.name]
     if (!subscription) {
-      console.warn(`Could not unsubscribe [${query.name}]: Not Found`)
+      // eslint-disable-next-line no-console
+      console.warn(`Could not unsubscribe [${componentOrView.query.name}]: Not Found`)
       return
     }
     // Remove viewOrComponent subscriber
-    delete subscription.subscribers[uid]
+    delete subscription.subscribers[componentOrView._uid]
     // If no more subscribers, then stop the subscription.
     if (Object.keys(subscription.subscribers).length === 0) {
       this.stopSubscription(subscription)
