@@ -162,9 +162,6 @@ import Vue from 'vue'
 import gql from 'graphql-tag'
 import pageMixin from '@/mixins/index'
 import graphqlMixin from '@/mixins/graphql'
-import subscriptionViewMixin from '@/mixins/subscriptionView'
-import subscriptionComponentMixin from '@/mixins/subscriptionComponent'
-import SubscriptionQuery from '@/model/SubscriptionQuery.model'
 import ViewToolbar from '@/components/cylc/ViewToolbar'
 import {
   initialOptions,
@@ -184,7 +181,8 @@ import {
   mdiChartTimelineVariant,
   mdiRefresh,
   mdiTable,
-  mdiChartLine
+  mdiChartLine,
+  mdiRefresh
 } from '@mdi/js'
 
 /** List of fields to request for task for each task */
@@ -207,12 +205,32 @@ const taskFields = [
   'minQueueTime',
   'queueQuartiles',
   'maxQueueTime'
-// list of fields to request for jobs
-const jobFields = [
-  'id',
-  'state',
-  'startedTime',
-  'finishedTime'
+// list of fields to request for tasks
+const taskFields = [
+  'name',
+  'platform',
+  'count',
+  'meanTotalTime',
+  'stdDevTotalTime',
+  'minTotalTime',
+  'firstQuartileTotal',
+  'secondQuartileTotal',
+  'thirdQuartileTotal',
+  'maxTotalTime',
+  'meanRunTime',
+  'stdDevRunTime',
+  'minRunTime',
+  'firstQuartileRun',
+  'secondQuartileRun',
+  'thirdQuartileRun',
+  'maxRunTime',
+  'meanQueueTime',
+  'stdDevQueueTime',
+  'minQueueTime',
+  'firstQuartileQueue',
+  'secondQuartileQueue',
+  'thirdQuartileQueue',
+  'maxQueueTime'
 ]
 
 /** The one-off query which retrieves historical task timing statistics */
@@ -224,43 +242,8 @@ query analysisTaskQuery ($workflows: [ID]) {
 // normally visible in the GUI
 const QUERY = gql`
 query ($workflows: [ID]) {
-  jobs(live: false, workflows: $workflows) {
-    ${jobFields.join('\n')}
-  }
-}
-`
-
-// the subscription which keeps up to date with the live
-// state of the workflow
-const SUBSCRIPTION = gql`
-subscription WorkflowGraphSubscription ($workflowId: ID) {
-  deltas(workflows: [$workflowId]) {
-    ...Deltas
-  }
-}
-
-fragment JobData on Job {
-  ${jobFields.join('\n')}
-}
-
-fragment AddedDelta on Added {
-  jobs {
-    ...JobData
-  }
-}
-
-fragment UpdatedDelta on Updated {
-  jobs {
-    ...JobData
-  }
-}
-
-fragment Deltas on Deltas {
-  added {
-    ...AddedDelta
-  }
-  updated (stripNull: true) {
-    ...UpdatedDelta
+  tasks(live: false, workflows: $workflows) {
+    ${taskFields.join('\n')}
   }
 }
 `
@@ -276,8 +259,8 @@ class AnalysisTaskCallback extends DeltasCallback {
 // the callback which gets automatically called when data comes in on
 // the subscription
 class AnalysisCallback {
-  constructor (jobs) {
-    this.jobs = jobs
+  constructor (tasks) {
+    this.tasks = tasks
   }
 
   /**
@@ -288,24 +271,14 @@ class AnalysisCallback {
       ...data.tasks.map((task) => pick(task, taskFields))
     )
   }
-    // add jobs contained in data to this.jobs
-    for (const job of data.jobs) {
-      if (job.id in this.jobs) {
-        // merge new data into existing entry
-        const storedJob = this.jobs[job.id]
-        for (const field of jobFields) {
-          if (job[field]) {
-            Vue.set(storedJob, field, job[field])
-          }
-        }
-      } else {
-        // add new entry
-        Vue.set(
-          this.jobs,
-          job.id,
-          pick(job, jobFields)
-        )
-      }
+    // add tasks contained in data to this.tasks
+    for (const task of data.tasks) {
+      // add new entry
+      Vue.set(
+        this.tasks,
+        this.tasks.length,
+        pick(task, taskFields)
+      )
     }
   }
 
@@ -334,9 +307,7 @@ export default {
   mixins: [
     graphqlMixin
     pageMixin,
-    graphqlMixin,
-    subscriptionComponentMixin,
-    subscriptionViewMixin
+    graphqlMixin
   ],
 
   name: 'Analysis',
@@ -400,6 +371,10 @@ export default {
     }
   },
 
+  beforeMount () {
+    this.historicalQuery()
+  },
+
   data () {
     const tasks = []
     return {
@@ -410,18 +385,6 @@ export default {
   },
 
   computed: {
-    // registers the subscription (unhelpfully named query)
-    // (this is called automatically)
-    query () {
-      this.historicalQuery() // TODO order
-      return new SubscriptionQuery(
-        SUBSCRIPTION,
-        this.variables,
-        'workflow',
-        [this.callback]
-      )
-    },
-
     // a list of the workflow IDs this view is "viewing"
     // NOTE: we plan multi-workflow functionality so we are writing views
     // to be mult-workflow compatible in advance of this feature arriving
@@ -476,11 +439,23 @@ export default {
     // run the one-off query for historical job data and pass its results
     // through the callback
     async historicalQuery () {
+      this.tasks = []
+      this.callback = new AnalysisCallback(this.tasks)
       const ret = await this.$workflowService.query2(
         QUERY,
         { workflows: this.workflowIDs }
       )
       this.callback.onAdded(ret.data)
+    },
+    matchTask (task) {
+      let ret = true
+      if (this.tasksFilter.name?.trim()) {
+        ret &&= task.name.includes(this.tasksFilter.name)
+      }
+      if (this.tasksFilter.platformOption?.trim()) {
+        ret &&= task.platform.includes(this.tasksFilter.platformOption)
+      }
+      return ret
     }
   }
 }

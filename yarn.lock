@@ -2719,6 +2719,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"apexcharts@npm:^3.37.1":
+  version: 3.37.1
+  resolution: "apexcharts@npm:3.37.1"
+  dependencies:
+    svg.draggable.js: ^2.2.2
+    svg.easing.js: ^2.0.0
+    svg.filter.js: ^2.0.2
+    svg.pathmorphing.js: ^0.1.3
+    svg.resize.js: ^1.4.3
+    svg.select.js: ^3.0.1
+  checksum: 83afb447f4cc2598bb986a2c6839f70811bad5f945e984554ec81cf489f587efff5c85bb3d38040e3db5cb998ca095a60b72328804519e909229e144048633cf
+  languageName: node
+  linkType: hard
+
 "append-transform@npm:^2.0.0":
   version: 2.0.0
   resolution: "append-transform@npm:2.0.0"
@@ -10315,6 +10329,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"vue-apexcharts@npm:^1.6.2":
+  version: 1.6.2
+  resolution: "vue-apexcharts@npm:1.6.2"
+  peerDependencies:
+    apexcharts: ^3.26.0
+  checksum: 20eac6d523a9c8e416e7ba834e051b5592f30d4dd25c1931bda1ad493ed663b0e43a53004d48dc011c6c49a8e8cb38fe2639303d9441fc020b744351bb7aeade
+  languageName: node
+  linkType: hard
+
 "vite-node@npm:3.0.8":
   version: 3.0.8
   resolution: "vite-node@npm:3.0.8"
@@ -10536,6 +10559,16 @@ __metadata:
   version: 3.17.5
   resolution: "vscode-languageserver-types@npm:3.17.5"
   checksum: 10c0/1e1260de79a2cc8de3e46f2e0182cdc94a7eddab487db5a3bd4ee716f67728e685852707d72c059721ce500447be9a46764a04f0611e94e4321ffa088eef36f8
+  languageName: node
+  linkType: hard
+
+"vue3-apexcharts@npm:^1.4.1":
+  version: 1.4.1
+  resolution: "vue3-apexcharts@npm:1.4.1"
+  peerDependencies:
+    apexcharts: "> 3.0.0"
+    vue: "> 3.0.0"
+  checksum: 01f2da799d3ae615284ce775127b6278ebcc3060203dd3d0eb14dd6e35b5c7f4cbf6d1828343c5fc54e76442bd440abb08fbc11dca8041f52ff944d0f0649844
   languageName: node
   linkType: hard
 
