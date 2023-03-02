@@ -163,6 +163,7 @@ import gql from 'graphql-tag'
 import pageMixin from '@/mixins/index'
 import graphqlMixin from '@/mixins/graphql'
 import ViewToolbar from '@/components/cylc/ViewToolbar'
+import VueApexCharts from 'vue-apexcharts'
 import {
   initialOptions,
   updateInitialOptionsEvent,
