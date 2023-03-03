@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (C) NIWA & British Crown (Met Office) & Contributors.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,11 +15,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+const IntrospectionQuery = require('./IntrospectionQuery.json')
+const userProfile = require('./userprofile.json')
+const taskProxy = require('./taskProxy.json')
+const familyProxy = require('./familyProxy.json')
+const App = require('./App')
+const analysisQuery = require('./analysisQuery.json')
+
 module.exports = {
-  plugins: [
-    'cypress'
-  ],
-  env: {
-    'cypress/globals': true
-  },
+  IntrospectionQuery,
+  taskProxy,
+  familyProxy,
+  userProfile,
+  App,
+  Workflow: App,
+  analysisQuery
 }
