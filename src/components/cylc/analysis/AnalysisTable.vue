@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <v-row
     no-gutters
-    class="c-table flex-grow-1 position-relative"
+    class="flex-grow-1 position-relative"
   >
     <v-col
       cols="12"
@@ -26,47 +26,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <v-container
         fluid
-        class="pa-0"
+        class="ma-0 pa-0 w-100 h-100 left-0 top-0 position-absolute"
       >
         <v-data-table
           :headers="shownHeaders"
           :items="tasks"
-          v-model:sort-by="sortBy"
-          density="compact"
-          v-model:page="page"
-          v-model:items-per-page="itemsPerPage"
-        >
-          <!-- Use custom format for values in columns that have a specified formatter: -->
-          <!-- Used to make durations human readable -->
-          <!-- Durations of 0 will be undefined unless allowZeros is true -->
-          <template
-            v-for="header in shownHeaders"
-            v-slot:[`item.${header.key}`]="{ item }"
-          >
-            {{ formatCell(item, header) }}
-          </template>
-          <template v-slot:bottom>
-            <v-data-table-footer :itemsPerPageOptions="$options.itemsPerPageOptions" />
-          </template>
-        </v-data-table>
+          :sort-by.sync="sortBy"
+          dense
+          :footer-props="{
+            itemsPerPageOptions: [10, 20, 50, 100, 200, -1],
+            showFirstLastPage: true
+          }"
+          :options="{ itemsPerPage: 50 }"
+        ></v-data-table>
       </v-container>
     </v-col>
   </v-row>
 </template>
 
 <script>
-import { upperFirst } from 'lodash'
-import { formatDuration } from '@/utils/tasks'
-import {
-  initialOptions,
-  updateInitialOptionsEvent,
-  useInitialOptions
-} from '@/utils/initialOptions'
-
 export default {
   name: 'AnalysisTableComponent',
-
-  emits: [updateInitialOptionsEvent],
 
   props: {
     tasks: {
@@ -76,50 +56,119 @@ export default {
     timingOption: {
       type: String,
       required: true
-    },
-    initialOptions,
-  },
-
-  setup (props, { emit }) {
-    /**
-     * The number of tasks displayed per page.
-     * @type {import('vue').Ref<number>}
-     */
-    const itemsPerPage = useInitialOptions('tasksFilter', { props, emit }, 50)
-
-    /**
-     * The 'sort by' state.
-     * @type {import('vue').Ref<array>}
-     */
-    const sortBy = useInitialOptions('sortBy', { props, emit }, [{ key: 'name', order: 'asc' }])
-
-    /**
-     * The page number state.
-     * @type {import('vue').Ref<number>}
-     */
-    const page = useInitialOptions('page', { props, emit }, 1)
-
-    return {
-      itemsPerPage,
-      sortBy,
-      page
     }
   },
 
   data () {
+    const tasks = []
     return {
+      sortBy: 'name',
       headers: [
         {
-          title: 'Task',
-          key: 'name'
+          text: 'Task',
+          value: 'name'
         },
         {
-          title: 'Platform',
-          key: 'platform'
+          text: 'Platform',
+          value: 'platform'
         },
         {
-          title: 'Count',
-          key: 'count'
+          text: 'Count',
+          value: 'count'
+        }
+        // {
+        //   text: 'Failure rate (%)',
+        //   value: 'failureRate'
+        // }
+      ],
+      queueTimeHeaders: [
+        {
+          text: 'Mean T-queue (s)',
+          value: 'meanQueueTime'
+        },
+        {
+          text: 'Std Dev T-queue (s)',
+          value: 'stdDevQueueTime'
+        },
+        {
+          text: 'Min T-queue (s)',
+          value: 'minQueueTime'
+        },
+        {
+          text: 'Q1 T-queue (s)',
+          value: 'firstQuartileQueue'
+        },
+        {
+          text: 'Median T-queue (s)',
+          value: 'secondQuartileQueue'
+        },
+        {
+          text: 'Q3 T-queue (s)',
+          value: 'thirdQuartileQueue'
+        },
+        {
+          text: 'Max T-queue (s)',
+          value: 'maxQueueTime'
+        }
+      ],
+      runTimeHeaders: [
+        {
+          text: 'Mean T-run (s)',
+          value: 'meanRunTime'
+        },
+        {
+          text: 'Std Dev T-run (s)',
+          value: 'stdDevRunTime'
+        },
+        {
+          text: 'Min T-run (s)',
+          value: 'minRunTime'
+        },
+        {
+          text: 'Q1 T-run (s)',
+          value: 'firstQuartileRun'
+        },
+        {
+          text: 'Median T-run (s)',
+          value: 'secondQuartileRun'
+        },
+        {
+          text: 'Q3 T-run (s)',
+          value: 'thirdQuartileRun'
+        },
+        {
+          text: 'Max T-run (s)',
+          value: 'maxRunTime'
+        }
+      ],
+      totalTimeHeaders: [
+        {
+          text: 'Mean T-total (s)',
+          value: 'meanTotalTime'
+        },
+        {
+          text: 'Std Dev T-total (s)',
+          value: 'stdDevTotalTime'
+        },
+        {
+          text: 'Min T-total (s)',
+          value: 'minTotalTime'
+        },
+        {
+          text: 'Q1 T-total (s)',
+          value: 'firstQuartileTotal'
+        },
+        {
+          text: 'Median T-total (s)',
+          value: 'secondQuartileTotal'
+        },
+        {
+          text: 'Q3 T-total (s)',
+          value: 'thirdQuartileTotal'
+        },
+        {
+          text: 'Max T-total (s)',
+          value: 'maxTotalTime'
         }
       ]
     }
@@ -127,78 +176,18 @@ export default {
 
   computed: {
     shownHeaders () {
-      const times = upperFirst(this.timingOption)
-      const timingHeaders = [
-        {
-          title: `Mean T-${times}`,
-          key: `mean${times}Time`,
-          formatter: formatDuration,
-          allowZeros: false
-        },
-        {
-          title: `Std Dev T-${times}`,
-          key: `stdDev${times}Time`,
-          formatter: formatDuration,
-          allowZeros: true
-        },
-        {
-          title: `Min T-${times}`,
-          key: `min${times}Time`,
-          formatter: formatDuration,
-          allowZeros: false
-        },
-        {
-          title: `Q1 T-${times}`,
-          key: `${times.toLowerCase()}Quartiles.0`,
-          formatter: formatDuration,
-          allowZeros: false
-        },
-        {
-          title: `Median T-${times}`,
-          key: `${times.toLowerCase()}Quartiles.1`,
-          formatter: formatDuration,
-          allowZeros: false
-        },
-        {
-          title: `Q3 T-${times}`,
-          key: `${times.toLowerCase()}Quartiles.2`,
-          formatter: formatDuration,
-          allowZeros: false
-        },
-        {
-          title: `Max T-${times}`,
-          key: `max${times}Time`,
-          formatter: formatDuration,
-          allowZeros: false
-        }
-      ]
+      let timingHeaders
+      if (this.timingOption === 'totalTimes') {
+        timingHeaders = this.totalTimeHeaders
+      } else if (this.timingOption === 'runTimes') {
+        timingHeaders = this.runTimeHeaders
+      } else if (this.timingOption === 'queueTimes') {
+        timingHeaders = this.queueTimeHeaders
+      } else {
+        return []
+      }
       return this.headers.concat(timingHeaders)
     }
-  },
-
-  methods: {
-    formatCell (item, header) {
-      const arrayMatch = header.key.match(/^(.+)\.(\d+)$/)
-      const key = arrayMatch?.[1] ?? header.key
-      let value = item[key]
-      if (arrayMatch) {
-        const index = arrayMatch[2]
-        value = value[index]
-      }
-      if (header.formatter) {
-        return header.formatter(value, header.allowZeros)
-      }
-      return value
-    }
-  },
-
-  itemsPerPageOptions: [
-    { value: 10, title: '10' },
-    { value: 20, title: '20' },
-    { value: 50, title: '50' },
-    { value: 100, title: '100' },
-    { value: 200, title: '200' },
-    { value: -1, title: 'All' }
-  ],
+  }
 }
 </script>
