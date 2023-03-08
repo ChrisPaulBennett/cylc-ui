@@ -163,7 +163,7 @@ import gql from 'graphql-tag'
 import pageMixin from '@/mixins/index'
 import graphqlMixin from '@/mixins/graphql'
 import ViewToolbar from '@/components/cylc/ViewToolbar'
-import VueApexCharts from 'vue-apexcharts'
+import BoxPlot from '@/components/cylc/analysis/BoxPlot'
 import {
   initialOptions,
   updateInitialOptionsEvent,
@@ -405,7 +405,6 @@ export default {
       return this.tasksFilter.timingOption.replace(/Times/, '')
     }
   },
-
   methods: {
     /**
      * Run the one-off query for historical task data and pass its results
