@@ -16,147 +16,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="c-analysis">
-    <v-container
-      fluid
-      class="pa-2"
   <div class="c-analysis" style="width: 100%; height: 100%">
-    <h3>Analysis View</h3>
-    <ViewToolbar :groups="groups" />
-    <ul
-      v-for="job of jobs"
-      :key="job.id"
+    <v-container
+    fluid
+    class="c-table ma-0 pa-2 h-100 flex-column d-flex"
     >
-      <!-- Filters -->
-      <v-row no-gutters>
+      <!-- Toolbar -->
+      <v-row
+        class="d-flex flex-wrap table-option-bar no-gutters flex-grow-0"
+      >
+        <!-- Filters -->
+        <v-row class="no-gutters">
+          <v-col
+            cols="12"
+            md="4"
+            class="pr-md-2 mb-2 mb-md-0"
+          >
+            <v-text-field
+              id="c-analysis-filter-task-name"
+              clearable
+              dense
+              flat
+              hide-details
+              outlined
+              placeholder="Filter by task name"
+              v-model.trim="tasksFilter.name"
+              ref="filterNameInput"
+            ></v-text-field>
+          </v-col>
+          <v-col
+            cols="12"
+            md="4"
+            class="mb-2 mb-md-0"
+          >
+            <v-select
+              id="c-analysis-filter-task-timings"
+              :items="timingOptions"
+              dense
+              flat
+              hide-details
+              outlined
+              prefix="Displaying: "
+              v-model="tasksFilter.timingOption"
+            ></v-select>
+          </v-col>
+          <v-col
+            cols="12"
+            md="4"
+            class="pl-md-2 mb-2 mb-md-0"
+          >
+            <v-select
+              id="c-analysis-filter-task-platforms"
+              :items="platformOptions"
+              dense
+              flat
+              hide-details
+              outlined
+              prefix="Platform: "
+              v-model="tasksFilter.platformOption"
+            ></v-select>
+          </v-col>
+        </v-row>
+      </v-row>
+      <ViewToolbar :groups="groups" />
+      <v-row
+        no-gutters
+        class="flex-grow-1 position-relative"
+      >
         <v-col
           cols="12"
-          md="4"
-          class="pr-md-2 mb-2 mb-md-0"
+          class="mh-100 position-relative"
         >
-          <v-text-field
-            id="c-analysis-filter-task-name"
-            clearable
-            placeholder="Filter by task name"
-            v-model.trim="tasksFilter.name"
-            ref="filterNameInput"
-            :disabled="chartType === 'timeSeries'"
-          />
-        </v-col>
-        <v-col
-          cols="12"
-          md="4"
-          class="mb-2 mb-md-0"
-        >
-          <v-select
-            id="c-analysis-filter-task-timings"
-            :items="$options.timingOptions"
-            prefix="Displaying:"
-            v-model="tasksFilter.timingOption"
-          />
-        </v-col>
-        <v-col
-          cols="12"
-          md="4"
-          class="pl-md-2 mb-2 mb-md-0"
-        >
-          <v-select
-            id="c-analysis-filter-task-platforms"
-            :items="platformOptions"
-            prefix="Platform:"
-            v-model="tasksFilter.platformOption"
-          />
+          <v-container
+            fluid
+            class="ma-0 pa-0 w-100 h-100 left-0 top-0 position-absolute"
+          >
+            <v-data-table
+              :headers="shownHeaders"
+              :items="filteredTasks"
+              :sort-by.sync="sortBy"
+              :page.sync="page"
+              :sortDesc.sync="sortDesc"
+              :itemsPerPage.sync="itemsPerPage"
+              dense
+              :footer-props="{
+                itemsPerPageOptions: [5, 10, 20, 50, 100, 200, -1],
+                showFirstLastPage: true
+              }"
+              :options="{ itemsPerPage: 50 }"
+            >
+            <template v-slot:top="{ pagination, options, updateOptions }">
+              <v-data-footer
+                :pagination="pagination"
+                :options="options"
+                @update:options="updateOptions"
+                items-per-page-text="$vuetify.dataTable.itemsPerPageText"/>
+            </template>
+          </v-data-table>
+            <BoxPlot :configOptions="configOptions" :workflowName="workflowName" :tasks="filteredTasks" :timingOption="tasksFilter.timingOption"></BoxPlot>
+          </v-container>
         </v-col>
       </v-row>
-      <div
-        ref="toolbar"
-        id="analysis-toolbar"
-        class="d-flex align-center flex-wrap my-2 col-gap-2 row-gap-4"
-      >
-        <!-- Toolbar -->
-        <v-defaults-provider
-          :defaults="{
-            VBtn: { icon: true, variant: 'text' },
-          }"
-        >
-          <v-btn-toggle
-            v-model="chartType"
-            mandatory
-            variant="outlined"
-            color="primary"
-          >
-            <v-btn
-              :value="'table'"
-              data-cy="table-toggle"
-            >
-              <v-icon :icon="$options.icons.mdiTable" />
-              <v-tooltip>Table view</v-tooltip>
-            </v-btn>
-            <v-btn
-              :value="'box'"
-              data-cy="box-plot-toggle"
-            >
-              <v-icon :icon="$options.icons.mdiChartTimeline" />
-              <v-tooltip>Box &amp; whiskers view</v-tooltip>
-            </v-btn>
-            <v-btn
-              :value="'timeSeries'"
-              data-cy="time-series-toggle"
-            >
-              <v-icon :icon="$options.icons.mdiChartTimelineVariant" />
-              <v-tooltip>Time series view</v-tooltip>
-            </v-btn>
-          </v-btn-toggle>
-          <v-btn
-            v-if="chartType === 'table' || chartType === 'box'"
-            @click="tasksQuery"
-            data-cy="analysis-refresh-btn"
-          >
-            <v-icon :icon="$options.icons.mdiRefresh" />
-            <v-tooltip>Refresh data</v-tooltip>
-          </v-btn>
-          <!-- Box plot sort input teleports here -->
-        </v-defaults-provider>
-      </div>
-      <AnalysisTable
-        v-if="chartType === 'table'"
-        :tasks="filteredTasks"
-        :timing-option="timingOption"
-        v-model:initial-options="dataTableOptions"
-      />
-      <BoxPlot
-        v-else-if="chartType === 'box'"
-        :tasks="filteredTasks"
-        :timing-option="timingOption"
-        :sort-input-teleport-target="toolbar?.id"
-        v-model:initial-options="boxPlotOptions"
-      />
-      <TimeSeries
-        v-else-if="chartType === 'timeSeries'"
-        :workflowIDs="workflowIDs"
-        :platform-option="tasksFilter.platformOption"
-        :timing-option="timingOption"
-        :sort-input-teleport-target="toolbar?.id"
-        v-model:initial-options="timeseriesPlotOptions"
-      />
     </v-container>
-      <li>
-        {{ job.id }}
-        <br />
-        <span style="padding-left: 1em">started: {{ job.startedTime }}</span>
-        <br />
-        <span style="padding-left: 1em">finished: {{ job.finishedTime }}</span>
-      </li>
-    </ul>
-  </div>
+      </div>
 </template>
 
 <script>
-import { ref } from 'vue'
-import {
-  debounce,
-  pick,
-} from 'lodash'
 import pick from 'lodash/pick'
 import Vue from 'vue'
 import gql from 'graphql-tag'
@@ -165,47 +130,10 @@ import graphqlMixin from '@/mixins/graphql'
 import ViewToolbar from '@/components/cylc/ViewToolbar'
 import BoxPlot from '@/components/cylc/analysis/BoxPlot'
 import {
-  initialOptions,
-  updateInitialOptionsEvent,
-  useInitialOptions
-} from '@/utils/initialOptions'
-import DeltasCallback from '@/services/callbacks'
-import AnalysisTable from '@/components/cylc/analysis/AnalysisTable.vue'
-import BoxPlot from '@/components/cylc/analysis/BoxPlot.vue'
-import TimeSeries from '@/components/cylc/analysis/TimeSeries.vue'
-import {
-  matchTask,
-  platformOptions
-} from '@/components/cylc/analysis/filter'
-import {
-  mdiChartTimeline,
-  mdiChartTimelineVariant,
-  mdiRefresh,
-  mdiTable,
   mdiChartLine,
   mdiRefresh
 } from '@mdi/js'
 
-/** List of fields to request for task for each task */
-const taskFields = [
-  'name',
-  'platform',
-  'count',
-  'meanTotalTime',
-  'stdDevTotalTime',
-  'minTotalTime',
-  'totalQuartiles',
-  'maxTotalTime',
-  'meanRunTime',
-  'stdDevRunTime',
-  'minRunTime',
-  'runQuartiles',
-  'maxRunTime',
-  'meanQueueTime',
-  'stdDevQueueTime',
-  'minQueueTime',
-  'queueQuartiles',
-  'maxQueueTime'
 // list of fields to request for tasks
 const taskFields = [
   'name',
@@ -234,11 +162,6 @@ const taskFields = [
   'maxQueueTime'
 ]
 
-/** The one-off query which retrieves historical task timing statistics */
-const TASK_QUERY = gql`
-query analysisTaskQuery ($workflows: [ID]) {
-  tasks(live: false, workflows: $workflows) {
-    ${taskFields.join('\n')}
 // the one-off query which retrieves historical objects not
 // normally visible in the GUI
 const QUERY = gql`
@@ -249,14 +172,6 @@ query ($workflows: [ID]) {
 }
 `
 
-/** The callback which gets called when data comes in from the query */
-class AnalysisTaskCallback extends DeltasCallback {
-  /**
-   * @param {Object[]} tasks
-   */
-  constructor (tasks) {
-    super()
-    this.tasks = tasks
 // the callback which gets automatically called when data comes in on
 // the subscription
 class AnalysisCallback {
@@ -264,14 +179,7 @@ class AnalysisCallback {
     this.tasks = tasks
   }
 
-  /**
-   * Add tasks contained in data to this.tasks
-   */
   add (data) {
-    this.tasks.push(
-      ...data.tasks.map((task) => pick(task, taskFields))
-    )
-  }
     // add tasks contained in data to this.tasks
     for (const task of data.tasks) {
       // add new entry
@@ -303,10 +211,7 @@ class AnalysisCallback {
 }
 
 export default {
-  name: 'Analysis',
-
   mixins: [
-    graphqlMixin
     pageMixin,
     graphqlMixin
   ],
@@ -314,61 +219,13 @@ export default {
   name: 'Analysis',
 
   components: {
-    AnalysisTable,
-    BoxPlot,
-    TimeSeries
+    ViewToolbar,
+    BoxPlot
   },
-
-  beforeMount () {
-    this.tasksQuery()
-  },
-
-  emits: [updateInitialOptionsEvent],
-
-  props: { initialOptions },
-
-  setup (props, { emit }) {
-    /**
-     * The task name, timing option and platform filter state.
-     * @type {import('vue').Ref<object>}
-     */
-    const tasksFilter = useInitialOptions('tasksFilter', { props, emit }, { name: '', timingOption: 'totalTimes', platformOption: -1 })
-
-    /**
-     * Determines the Analysis type ('table' | 'box' | 'timeSeries')
-     * @type {import('vue').Ref<string>}
-     */
-    const chartType = useInitialOptions('chartType', { props, emit }, 'table')
-
-    /** @type {import('vue').Ref<HTMLElement>} template ref */
-    const toolbar = ref(null)
-
-    /**
-     * The Vuetify data table options (sortBy, page etc).
-     * @type {import('vue').Ref<object>}
-     */
-    const dataTableOptions = useInitialOptions('dataTableOptions', { props, emit })
-
-    /**
-     * The Vuetify box and whisker plot options (sortBy, page etc).
-     * @type {import('vue').Ref<object>}
-     */
-    const boxPlotOptions = useInitialOptions('boxPlotOptions', { props, emit })
-
-    /**
-     * The Vuetify box and whisker plot options (displayedTasks, showOrigin).
-     * @type {import('vue').Ref<object>}
-     */
-    const timeseriesPlotOptions = useInitialOptions('timeseriesPlotOptions', { props, emit })
 
   metaInfo () {
     return {
-      tasksFilter,
-      chartType,
-      toolbar,
-      dataTableOptions,
-      boxPlotOptions,
-      timeseriesPlotOptions
+      title: this.getPageTitle('App.workflow', { name: this.workflowName })
     }
   },
 
@@ -379,9 +236,153 @@ export default {
   data () {
     const tasks = []
     return {
-      callback: new AnalysisTaskCallback(tasks),
-      /** Object containing all of the tasks added by the callback */
+      // defines how the view view appears in the "add view" dropdown
+      widget: {
+        title: 'analysis',
+        icon: mdiChartLine
+      },
+      // defines controls which get added to the toolbar
+      // (see Graph.vue for example usage)
+      groups: [
+        {
+          title: 'Analysis',
+          controls: [
+            {
+              title: 'Refresh data',
+              icon: mdiRefresh,
+              action: 'callback',
+              callback: this.historicalQuery
+            }
+          ]
+        }
+      ],
+      // instance of the callback class
+      callback: new AnalysisCallback(tasks),
+      // object containing all of the tasks added by the callback
       tasks,
+      sortBy: 'name',
+      page: 1,
+      sortDesc: false,
+      itemsPerPage: 50,
+      timingOptions: [
+        { text: 'Total times', value: 'totalTimes' },
+        { text: 'Run times', value: 'runTimes' },
+        { text: 'Queue times', value: 'queueTimes' }
+      ],
+      tasksFilter: {
+        name: '',
+        timingOption: 'totalTimes',
+        platformOption: null
+      },
+      activeFilters: null,
+      headers: [
+        {
+          text: 'Task',
+          value: 'name'
+        },
+        {
+          text: 'Platform',
+          value: 'platform'
+        },
+        {
+          text: 'Count',
+          value: 'count'
+        }
+        // {
+        //   text: 'Failure rate (%)',
+        //   value: 'failureRate'
+        // }
+      ],
+      queueTimeHeaders: [
+        {
+          text: 'Mean T-queue (s)',
+          value: 'meanQueueTime'
+        },
+        {
+          text: 'Std Dev T-queue (s)',
+          value: 'stdDevQueueTime'
+        },
+        {
+          text: 'Min T-queue (s)',
+          value: 'minQueueTime'
+        },
+        {
+          text: 'Q1 T-queue (s)',
+          value: 'firstQuartileQueue'
+        },
+        {
+          text: 'Median T-queue (s)',
+          value: 'secondQuartileQueue'
+        },
+        {
+          text: 'Q3 T-queue (s)',
+          value: 'thirdQuartileQueue'
+        },
+        {
+          text: 'Max T-queue (s)',
+          value: 'maxQueueTime'
+        }
+      ],
+      runTimeHeaders: [
+        {
+          text: 'Mean T-run (s)',
+          value: 'meanRunTime'
+        },
+        {
+          text: 'Std Dev T-run (s)',
+          value: 'stdDevRunTime'
+        },
+        {
+          text: 'Min T-run (s)',
+          value: 'minRunTime'
+        },
+        {
+          text: 'Q1 T-run (s)',
+          value: 'firstQuartileRun'
+        },
+        {
+          text: 'Median T-run (s)',
+          value: 'secondQuartileRun'
+        },
+        {
+          text: 'Q3 T-run (s)',
+          value: 'thirdQuartileRun'
+        },
+        {
+          text: 'Max T-run (s)',
+          value: 'maxRunTime'
+        }
+      ],
+      totalTimeHeaders: [
+        {
+          text: 'Mean T-total (s)',
+          value: 'meanTotalTime'
+        },
+        {
+          text: 'Std Dev T-total (s)',
+          value: 'stdDevTotalTime'
+        },
+        {
+          text: 'Min T-total (s)',
+          value: 'minTotalTime'
+        },
+        {
+          text: 'Q1 T-total (s)',
+          value: 'firstQuartileTotal'
+        },
+        {
+          text: 'Median T-total (s)',
+          value: 'secondQuartileTotal'
+        },
+        {
+          text: 'Q3 T-total (s)',
+          value: 'thirdQuartileTotal'
+        },
+        {
+          text: 'Max T-total (s)',
+          value: 'maxTotalTime'
+        }
+      ]
     }
   },
 
@@ -392,50 +393,43 @@ export default {
     workflowIDs () {
       return [this.workflowId]
     },
-
+    configOptions () {
+      return {
+        sortBy: this.sortBy,
+        page: this.page,
+        sortDesc: this.sortDesc,
+        itemsPerPage: this.itemsPerPage
+      }
+    },
     filteredTasks () {
-      return this.tasks.filter(task => matchTask(task, this.tasksFilter))
+      return this.tasks.filter(task => this.matchTask(task))
     },
-
+    shownHeaders () {
+      let timingHeaders
+      if (this.tasksFilter.timingOption === 'totalTimes') {
+        timingHeaders = this.totalTimeHeaders
+      } else if (this.tasksFilter.timingOption === 'runTimes') {
+        timingHeaders = this.runTimeHeaders
+      } else if (this.tasksFilter.timingOption === 'queueTimes') {
+        timingHeaders = this.queueTimeHeaders
+      } else {
+        return []
+      }
+      return this.headers.concat(timingHeaders)
+    },
     platformOptions () {
-      return platformOptions(this.tasks)
-    },
-
-    timingOption () {
-      return this.tasksFilter.timingOption.replace(/Times/, '')
+      const platformOptions = [{ text: 'All', value: null }]
+      const platforms = []
+      for (const [key, task] of Object.entries(this.tasks)) {
+        if (!platforms.includes(task.platform)) {
+          platforms.push(task.platform)
+          platformOptions.push({ text: task.platform })
+        }
+      }
+      return platformOptions
     }
   },
   methods: {
-    /**
-     * Run the one-off query for historical task data and pass its results
-     * through the callback
-     */
-    tasksQuery: debounce(
-      async function () {
-        this.tasks = []
-        this.callback = new AnalysisTaskCallback(this.tasks)
-        const ret = await this.$workflowService.query2(
-          TASK_QUERY,
-          { workflows: this.workflowIDs }
-        )
-        this.callback.onAdded(ret.data)
-      },
-      200 // only re-run this once every 0.2 seconds
-    )
-  },
-
-  icons: {
-    mdiChartTimeline,
-    mdiChartTimelineVariant,
-    mdiRefresh,
-    mdiTable,
-  },
-
-  timingOptions: [
-    { value: 'totalTimes', title: 'Total times' },
-    { value: 'runTimes', title: 'Run times' },
-    { value: 'queueTimes', title: 'Queue times' },
-  ],
     // run the one-off query for historical job data and pass its results
     // through the callback
     async historicalQuery () {
