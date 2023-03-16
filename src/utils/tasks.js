@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (C) NIWA & British Crown (Met Office) & Contributors.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@ import { TASK_OUTPUT_NAMES } from '@/model/TaskOutput.model'
 
 /**
  * States used when the parent is stopped.
- * @type {TaskState[]}
+ * @type {Array<TaskState>}
  */
 const isStoppedOrderedStates = [
   TaskState.SUBMIT_FAILED,
@@ -35,12 +35,12 @@ const isStoppedOrderedStates = [
 
 /**
  * Gives a single state, based on a list of states of children nodes.
- * @param {TaskState[]} childStates children nodes
- * @param {boolean} isStopped whether the parent node is stopped or not
- * @returns {string} a valid Task State name, or empty string if not found
+ * @param childStates {Array<TaskState>} children nodes
+ * @param isStopped {boolean} whether the parent node is stopped or not
+ * @returns {string} a valid Task State name, or null if not found
  * @link @see https://github.com/cylc/cylc-flow/blob/d66ae5c3ce8c749c8178d1cd53cb8c81d1560346/lib/cylc/task_state_prop.py
  */
-export function extractGroupState (childStates, isStopped = false) {
+function extractGroupState (childStates, isStopped = false) {
   const states = isStopped ? isStoppedOrderedStates : TaskState.enumValues
   for (const state of states) {
     if (childStates.includes(state.name)) {
@@ -50,8 +50,11 @@ export function extractGroupState (childStates, isStopped = false) {
   return ''
 }
 
-export function latestJob (taskProxy) {
-  return taskProxy?.children?.[0]?.node
+function latestJob (taskProxy) {
+  if (taskProxy && taskProxy.children && taskProxy.children.length > 0) {
+    return taskProxy.children[0].node
+  }
+  return null
 }
 
 /** Returns an array of task messages and custom outputs for a job node.
@@ -67,36 +70,38 @@ export function latestJob (taskProxy) {
  *   }
  * }
  */
-export function jobMessageOutputs (jobNode) {
+function jobMessageOutputs (jobNode) {
   const ret = []
+  let messageOutput
 
   for (const message of jobNode.node.messages || []) {
     if (TASK_OUTPUT_NAMES.includes(message)) {
       continue
     }
-    const messageOutput = jobNode.node.taskProxy?.outputs?.find(
-      (output) => message === output.message
-    )
-    ret.push({
-      level: undefined, // TODO: https://github.com/cylc/cylc-ui/pull/1436
-      label: messageOutput?.label ?? message,
-      message: messageOutput?.message ?? `Task message: ${message}`,
-      isMessage: !messageOutput,
-    })
+    messageOutput = null
+    for (const output of jobNode.node.taskProxy?.outputs || []) {
+      if (message === output.label) {
+        messageOutput = output
+        break
+      }
+    }
+    if (messageOutput) {
+      // add an output to the list
+      ret.push(messageOutput)
+    } else {
+      // add a message to the list and make it look like an output
+      ret.push({
+        label: message,
+        message: `Task Message: ${message}`,
+        isMessage: true
+      })
+    }
   }
   return ret
 }
 
-/**
- * Convert duration to an easily read format
- * Durations of 0 seconds return undefined unless allowZeros is true
- *
- * @param {number=} dur Duration in seconds
- * @param {boolean} [allowZeros=false] Whether durations of 0 are formatted as
- * 00:00:00, rather than undefined
- * @return {string=} Formatted duration
- */
-export function formatDuration (dur, allowZeros = false) {
+function formatDuration (dur, allowZeros = false) {
+  // Convert to an easily read duration format:
   if (dur || (dur === 0 && allowZeros === true)) {
     const seconds = dur % 60
     const minutes = ((dur - seconds) / 60) % 60
@@ -118,26 +123,16 @@ export function formatDuration (dur, allowZeros = false) {
   return undefined
 }
 
-export function dtMean (taskNode) {
+function dtMean (taskNode) {
   // Convert to an easily read duration format:
   const dur = taskNode.node?.task?.meanElapsedTime
   return formatDuration(dur)
 }
 
-/**
- * @param {string} flowNums - Flow numbers in DB format
- * @returns {string} - Flow numbers in pretty format
- */
-export function formatFlowNums (flowNums) {
-  return JSON.parse(flowNums).join(', ') || 'None'
-}
-
-/**
- * Return whether a task is in the None flow.
- *
- * @param {string=} flowNums
- * @returns {boolean}
- */
-export function isFlowNone (flowNums) {
-  return Boolean(flowNums && !JSON.parse(flowNums).length)
+export {
+  extractGroupState,
+  latestJob,
+  jobMessageOutputs,
+  formatDuration,
+  dtMean
 }
