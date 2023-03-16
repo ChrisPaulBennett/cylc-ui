@@ -38,13 +38,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             showFirstLastPage: true
           }"
           :options="{ itemsPerPage: 50 }"
-        ></v-data-table>
+        >
+          <template
+            v-for="header in shownHeaders.filter(header => header.hasOwnProperty('formatter'))"
+            v-slot:[`item.${header.value}`]="{ value }"
+          >
+            {{ header.formatter(value, header.allowZeros) }}
+          </template>
+        </v-data-table>
       </v-container>
     </v-col>
   </v-row>
 </template>
 
 <script>
+import { formatDuration } from '@/utils/tasks'
+
 export default {
   name: 'AnalysisTableComponent',
 
@@ -60,7 +69,6 @@ export default {
   },
 
   data () {
-    const tasks = []
     return {
       sortBy: 'name',
       headers: [
@@ -80,112 +88,66 @@ export default {
         //   text: 'Failure rate (%)',
         //   value: 'failureRate'
         // }
-      ],
-      queueTimeHeaders: [
-        {
-          text: 'Mean T-queue (s)',
-          value: 'meanQueueTime'
-        },
-        {
-          text: 'Std Dev T-queue (s)',
-          value: 'stdDevQueueTime'
-        },
-        {
-          text: 'Min T-queue (s)',
-          value: 'minQueueTime'
-        },
-        {
-          text: 'Q1 T-queue (s)',
-          value: 'firstQuartileQueue'
-        },
-        {
-          text: 'Median T-queue (s)',
-          value: 'secondQuartileQueue'
-        },
-        {
-          text: 'Q3 T-queue (s)',
-          value: 'thirdQuartileQueue'
-        },
-        {
-          text: 'Max T-queue (s)',
-          value: 'maxQueueTime'
-        }
-      ],
-      runTimeHeaders: [
-        {
-          text: 'Mean T-run (s)',
-          value: 'meanRunTime'
-        },
-        {
-          text: 'Std Dev T-run (s)',
-          value: 'stdDevRunTime'
-        },
-        {
-          text: 'Min T-run (s)',
-          value: 'minRunTime'
-        },
-        {
-          text: 'Q1 T-run (s)',
-          value: 'firstQuartileRun'
-        },
-        {
-          text: 'Median T-run (s)',
-          value: 'secondQuartileRun'
-        },
-        {
-          text: 'Q3 T-run (s)',
-          value: 'thirdQuartileRun'
-        },
-        {
-          text: 'Max T-run (s)',
-          value: 'maxRunTime'
-        }
-      ],
-      totalTimeHeaders: [
-        {
-          text: 'Mean T-total (s)',
-          value: 'meanTotalTime'
-        },
-        {
-          text: 'Std Dev T-total (s)',
-          value: 'stdDevTotalTime'
-        },
-        {
-          text: 'Min T-total (s)',
-          value: 'minTotalTime'
-        },
-        {
-          text: 'Q1 T-total (s)',
-          value: 'firstQuartileTotal'
-        },
-        {
-          text: 'Median T-total (s)',
-          value: 'secondQuartileTotal'
-        },
-        {
-          text: 'Q3 T-total (s)',
-          value: 'thirdQuartileTotal'
-        },
-        {
-          text: 'Max T-total (s)',
-          value: 'maxTotalTime'
-        }
       ]
     }
   },
 
   computed: {
     shownHeaders () {
-      let timingHeaders
+      let times
       if (this.timingOption === 'totalTimes') {
-        timingHeaders = this.totalTimeHeaders
+        times = 'Total'
       } else if (this.timingOption === 'runTimes') {
-        timingHeaders = this.runTimeHeaders
+        times = 'Run'
       } else if (this.timingOption === 'queueTimes') {
-        timingHeaders = this.queueTimeHeaders
+        times = 'Queue'
       } else {
-        return []
+        return this.headers
       }
+      const timingHeaders = [
+        {
+          text: `Mean T-${times}`,
+          value: `mean${times}Time`,
+          formatter: formatDuration,
+          allowZeros: false
+        },
+        {
+          text: `Std Dev T-${times}`,
+          value: `stdDev${times}Time`,
+          formatter: formatDuration,
+          allowZeros: true
+        },
+        {
+          text: `Min T-${times}`,
+          value: `min${times}Time`,
+          formatter: formatDuration,
+          allowZeros: false
+        },
+        {
+          text: `Q1 T-${times}`,
+          value: `firstQuartile${times}`,
+          formatter: formatDuration,
+          allowZeros: false
+        },
+        {
+          text: `Median T-${times}`,
+          value: `secondQuartile${times}`,
+          formatter: formatDuration,
+          allowZeros: false
+        },
+        {
+          text: `Q3 T-${times}`,
+          value: `thirdQuartile${times}`,
+          formatter: formatDuration,
+          allowZeros: false
+        },
+        {
+          text: `Max T-${times}`,
+          value: `max${times}Time`,
+          formatter: formatDuration,
+          allowZeros: false
+        }
+      ]
       return this.headers.concat(timingHeaders)
     }
   }

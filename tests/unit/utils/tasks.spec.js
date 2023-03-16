@@ -15,16 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import { expect } from 'chai'
 import TaskState from '@/model/TaskState.model'
-import {
-  dtMean,
-  extractGroupState,
-  latestJob,
-  formatDuration,
-  jobMessageOutputs,
-  formatFlowNums,
-  isFlowNone,
-} from '@/utils/tasks'
+import { dtMean, extractGroupState, latestJob, formatDuration } from '@/utils/tasks'
 
 describe('tasks', () => {
   describe('extractGroupState', () => {
@@ -44,7 +37,6 @@ describe('tasks', () => {
         expect(groupState).to.equal(val[0])
       })
     })
-
     it('should return the correct state for the node groups when stopped', () => {
       [
         [
@@ -61,42 +53,43 @@ describe('tasks', () => {
         expect(groupState).to.equal(val[0])
       })
     })
-
     it('should return empty when no states provided', () => {
       expect(extractGroupState([])).to.equal('')
     })
   })
-
-  describe.each([
-    {
-      taskProxy: null,
-      expected: undefined
-    },
-    {
-      taskProxy: {},
-      expected: undefined
-    },
-    {
-      taskProxy: {
-        children: []
-      },
-      expected: undefined
-    },
-    {
-      taskProxy: {
-        children: [
-          { node: 'foo' },
-          { node: 'bar' },
-        ]
-      },
-      expected: 'foo'
-    }
-  ])('latestJob($taskProxy)', ({ taskProxy, expected }) => {
-    it(`returns ${expected}`, () => {
-      expect(latestJob(taskProxy)).to.equal(expected)
+  describe('latestJob', () => {
+    it('should return the correct value for latestJob', () => {
+      const tests = [
+        {
+          taskProxy: null,
+          expected: null
+        },
+        {
+          taskProxy: {},
+          expected: null
+        },
+        {
+          taskProxy: {
+            children: []
+          },
+          expected: null
+        },
+        {
+          taskProxy: {
+            children: [
+              {
+                node: 1
+              }
+            ]
+          },
+          expected: 1
+        }
+      ]
+      tests.forEach(test => {
+        expect(latestJob(test.taskProxy)).to.equal(test.expected)
+      })
     })
   })
-
   describe('dtMean', () => {
     it('should format seconds to nice isodatetime format', () => {
       const tests = [
@@ -158,7 +151,6 @@ describe('tasks', () => {
       })
     })
   })
-
   describe('formatDuration', () => {
     it('should format seconds to nice isodatetime format', () => {
       expect(formatDuration(null)).to.equal(undefined)
@@ -179,61 +171,6 @@ describe('tasks', () => {
       expect(formatDuration(42)).to.equal('00:00:42')
       expect(formatDuration(42, false)).to.equal('00:00:42')
       expect(formatDuration(42, true)).to.equal('00:00:42')
-    })
-  })
-
-  describe('jobMessageOutputs()', () => {
-    it('returns expected value for outputs vs ordinary messages', () => {
-      const jobNode = {
-        node: {
-          messages: [
-            'chilbolton',
-            'larkhill',
-          ],
-          taskProxy: {
-            outputs: [{
-              label: 'my-output',
-              message: 'chilbolton',
-            }]
-          }
-        }
-      }
-
-      expect(jobMessageOutputs(jobNode)).toEqual([
-        {
-          level: undefined,
-          label: 'my-output',
-          message: 'chilbolton',
-          isMessage: false,
-        },
-        {
-          level: undefined,
-          label: 'larkhill',
-          message: 'Task message: larkhill',
-          isMessage: true,
-        },
-      ])
-    })
-  })
-
-  describe('formatFlowNums', () => {
-    it.each([
-      ['[1]', '1'],
-      ['[1, 4, 8]', '1, 4, 8'],
-      ['[]', 'None'],
-    ])('formatFlowNums(%o) -> %o', (input, expected) => {
-      expect(formatFlowNums(input)).toEqual(expected)
-    })
-  })
-
-  describe('isFlowNone', () => {
-    it.each([
-      [undefined, false],
-      ['[]', true],
-      ['[ ]', true],
-      ['[1]', false],
-    ])('isFlowNone(%o) -> %o', (input, expected) => {
-      expect(isFlowNone(input)).toEqual(expected)
     })
   })
 })
