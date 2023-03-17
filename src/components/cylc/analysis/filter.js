@@ -30,7 +30,7 @@ export function matchTask (task, tasksFilter) {
   if (tasksFilter.name?.trim()) {
     ret &&= task.name.includes(tasksFilter.name)
   }
-  if (tasksFilter.platformOption.trim?.()) {
+  if (tasksFilter.platformOption?.trim()) {
     ret &&= task.platform === tasksFilter.platformOption
   }
   return ret
@@ -44,12 +44,12 @@ export function matchTask (task, tasksFilter) {
  * @return {array} - An array of unique platform objects
  */
 export function platformOptions (tasks) {
-  const platformOptions = [{ value: -1, title: 'All' }]
+  const platformOptions = [{ text: 'All', value: null }]
   const platforms = []
-  for (const task of tasks) {
+  for (const task of Object.values(tasks)) {
     if (!platforms.includes(task.platform)) {
       platforms.push(task.platform)
-      platformOptions.push({ value: task.platform, title: task.platform })
+      platformOptions.push({ text: task.platform, value: task.platform })
     }
   }
   return platformOptions

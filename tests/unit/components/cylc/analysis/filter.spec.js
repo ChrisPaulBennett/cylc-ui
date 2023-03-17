@@ -15,21 +15,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {
-  matchTask,
-  platformOptions
-} from '@/components/cylc/analysis/filter'
+import { expect } from 'chai'
+import { matchTask, platformOptions } from '@/components/cylc/analysis/filter'
 
 describe('matchTask', () => {
   const task = {
     name: 'task_name',
     platform: 'task_platform'
   }
-
   it('should match with default or matching filter values', () => {
     const filters = [
-      { name: '', platformOption: -1 },
-      { name: 'task_name', platformOption: -1 },
+      { name: '', platformOption: null },
+      { name: 'task_name', platformOption: null },
       { name: '', platformOption: 'task_platform' },
       { name: 'task_name', platformOption: 'task_platform' }
     ]
@@ -37,7 +34,6 @@ describe('matchTask', () => {
       expect(matchTask(task, filter)).to.equal(true)
     })
   })
-
   it('should not match if at least one of the filter options does not match', () => {
     const filters = [
       { name: 'task_name', platformOption: 'wrong_platform' },
@@ -48,12 +44,11 @@ describe('matchTask', () => {
       expect(matchTask(task, filter)).to.equal(false)
     })
   })
-
   it('should allow partial matches of names but not platforms', () => {
     const filterNames = [
-      { name: 'task_', platformOption: -1 },
-      { name: '_name', platformOption: -1 },
-      { name: 'sk_na', platformOption: -1 }
+      { name: 'task_', platformOption: null },
+      { name: '_name', platformOption: null },
+      { name: 'sk_na', platformOption: null }
     ]
     const filterPlatforms = [
       { name: '', platformOption: 'platform' },
@@ -68,7 +63,6 @@ describe('matchTask', () => {
     })
   })
 })
-
 describe('platformOptions', () => {
   it('should return all unique platforms and the "all" option', () => {
     const tasks = [
@@ -77,11 +71,11 @@ describe('platformOptions', () => {
       { platform: 'platform_2' }
     ]
     const expected = [
-      { title: 'All', value: -1 },
-      { title: 'platform_1', value: 'platform_1' },
-      { title: 'platform_2', value: 'platform_2' }
+      { text: 'All', value: null },
+      { text: 'platform_1', value: 'platform_1' },
+      { text: 'platform_2', value: 'platform_2' }
     ]
-    expect(platformOptions([])).to.deep.equal([{ title: 'All', value: -1 }])
+    expect(platformOptions([])).to.deep.equal([{ text: 'All', value: null }])
     expect(platformOptions(tasks)).to.deep.equal(expected)
   })
 })
