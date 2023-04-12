@@ -75,11 +75,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </v-col>
       </v-row>
-      <ViewToolbar :groups="groups" />
+      <ViewToolbar :groups="groups" @setOption="setOption"/>
       <AnalysisTable
+        v-if="table"
         :tasks="filteredTasks"
         :timingOption="tasksFilter.timingOption"
         />
+      <BoxPlot
+        v-else
+        :configOptions="configOptions"
+        :workflowName="workflowName"
+        :tasks="filteredTasks"
+        :timingOption="tasksFilter.timingOption">
+      </BoxPlot>
+      <v-pagination
+        v-if="!table"
+        v-model="page"
+        :length="Math.ceil(filteredTasks.length/itemsPerPage)"
+        :total-visible="7"/>
     </v-container>
   </div>
 </template>
@@ -91,15 +104,17 @@ import gql from 'graphql-tag'
 import pageMixin from '@/mixins/index'
 import graphqlMixin from '@/mixins/graphql'
 import ViewToolbar from '@/components/cylc/ViewToolbar'
+import BoxPlot from '@/components/cylc/analysis/BoxPlot'
+import {
+  mdiChartLine,
+  mdiRefresh,
+  mdiTable
+} from '@mdi/js'
 import AnalysisTable from '@/components/cylc/analysis/AnalysisTable'
 import {
   matchTask,
   platformOptions
 } from '@/components/cylc/analysis/filter'
-import {
-  mdiChartLine,
-  mdiRefresh
-} from '@mdi/js'
 
 /** List of fields to request for task for each task */
 const taskFields = [
@@ -185,7 +200,8 @@ export default {
 
   components: {
     ViewToolbar,
-    AnalysisTable
+    AnalysisTable,
+    BoxPlot
   },
 
   metaInfo () {
@@ -201,10 +217,12 @@ export default {
   data () {
     const tasks = []
     return {
+      // defines how the view view appears in the "add view" dropdown
       widget: {
         title: 'analysis',
         icon: mdiChartLine
       },
+      table: true,
       /** Defines controls which get added to the toolbar */
       groups: [
         {
@@ -215,14 +233,25 @@ export default {
               icon: mdiRefresh,
               action: 'callback',
               callback: this.historicalQuery
+            },
+            {
+              title: 'Toggle',
+              icon: mdiTable,
+              action: 'toggle',
+              key: 'table',
+              value: true
             }
           ]
         }
       ],
+      // instance of the callback class
       callback: new AnalysisCallback(tasks),
-      /** Object containing all of the tasks added by the callback */
+      // object containing all of the tasks added by the callback
       tasks,
       sortBy: 'name',
+      page: 1,
+      sortDesc: false,
+      itemsPerPage: 20,
       timingOptions: [
         { text: 'Total times', value: 'totalTimes' },
         { text: 'Run times', value: 'runTimes' },
@@ -241,6 +270,14 @@ export default {
     workflowIDs () {
       return [this.workflowId]
     },
+    configOptions () {
+      return {
+        sortBy: this.sortBy,
+        page: this.page,
+        sortDesc: this.sortDesc,
+        itemsPerPage: this.itemsPerPage
+      }
+    },
     filteredTasks () {
       return this.tasks.filter(task => matchTask(task, this.tasksFilter))
     },
@@ -248,7 +285,6 @@ export default {
       return platformOptions(this.tasks)
     }
   },
-
   methods: {
     async historicalQuery () {
       this.tasks = []
@@ -258,6 +294,9 @@ export default {
         { workflows: this.workflowIDs }
       )
       this.callback.onAdded(ret.data)
+    },
+    setOption (option, value) {
+      Vue.set(this, option, value)
     }
   }
 }
