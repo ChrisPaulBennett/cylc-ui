@@ -130,6 +130,30 @@ export default [
     name: 'analysis',
     meta: {
       layout: 'default',
+      toolbar: true
+    },
+    props: true
+  },
+  {
+    path: '/guide',
+    name: 'Guide',
+    view: 'Guide',
+    meta: {
+      layout: 'default'
+    }
+  },
+  {
+    path: '/graphiql',
+    view: 'GraphiQL',
+    meta: {
+      layout: 'empty'
+    }
+  },
+  {
+    path: '*',
+    view: 'NotFound',
+    meta: {
+      layout: 'default',
       toolbar: true,
       showSidebar: false
     },
