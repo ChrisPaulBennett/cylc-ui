@@ -162,6 +162,25 @@ export default {
       const { start, end } = timingOptions.get(this.timingOption)
       return {
         chart: {
+          defaultLocale: 'en',
+          locales: [
+            {
+              name: 'en',
+              options: {
+                toolbar: {
+                  exportToSVG: 'Download SVG',
+                  exportToPNG: 'Download PNG',
+                  menu: 'Download',
+                  selection: 'Selection',
+                  selectionZoom: 'Selection Zoom',
+                  zoomIn: 'Zoom In',
+                  zoomOut: 'Zoom Out',
+                  pan: 'Panning',
+                  reset: 'Reset Zoom'
+                }
+              }
+            }
+          ],
           animations: {
             enabled: this.animate && !this.reducedAnimation,
             easing: 'easeinout',
@@ -179,6 +198,12 @@ export default {
           toolbar: {
             tools: {
               download: `<svg class="w-100 h-100"><path d="${mdiDownload}"></path></svg>`,
+              selection: true,
+              zoom: true,
+              zoomin: true,
+              zoomout: true,
+              pan: true,
+              reset: true
             },
           },
         },
@@ -209,11 +234,11 @@ export default {
         xaxis: {
           labels: {
             formatter: function (value, timestamp, opts) {
-              return new Date(value).toTimeString().slice(0, 9)
+              return new Date(value).toUTCString().slice(17, -3)
             }
           },
           title: {
-            text: 'Time',
+            text: 'Time (UTC)',
           },
         },
         yaxis: {
