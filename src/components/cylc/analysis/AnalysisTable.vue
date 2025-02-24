@@ -109,50 +109,91 @@ export default {
       }
       const timingHeaders = [
         {
-          text: `Mean T-${times}`,
-          value: `mean${times}Time`,
+          title: `Mean ${times}`,
+          key: `${formatHeader('mean', times)}`,
           formatter: formatDuration,
-          allowZeros: false
+          allowZeros: false,
+          timingOption: this.timingOption
         },
         {
-          text: `Std Dev T-${times}`,
-          value: `stdDev${times}Time`,
+          title: `Std Dev ${times}`,
+          key: `${formatHeader('stdDev', times)}`,
           formatter: formatDuration,
-          allowZeros: true
+          allowZeros: true,
+          timingOption: this.timingOption
         },
         {
-          text: `Min T-${times}`,
-          value: `min${times}Time`,
+          title: `Min ${times}`,
+          key: `${formatHeader('min', times)}`,
           formatter: formatDuration,
-          allowZeros: false
+          allowZeros: false,
+          timingOption: this.timingOption
         },
         {
-          text: `Q1 T-${times}`,
-          value: `firstQuartile${times}`,
+          title: `Q1 ${times}`,
+          key: `${formatHeader('quartiles', times)}Quartiles.0`,
           formatter: formatDuration,
-          allowZeros: false
+          allowZeros: false,
+          timingOption: this.timingOption
         },
         {
-          text: `Median T-${times}`,
-          value: `secondQuartile${times}`,
+          title: `Median ${times}`,
+          key: `${formatHeader('quartiles', times)}Quartiles.1`,
           formatter: formatDuration,
-          allowZeros: false
+          allowZeros: false,
+          timingOption: this.timingOption
         },
         {
-          text: `Q3 T-${times}`,
-          value: `thirdQuartile${times}`,
+          title: `Q3 ${times}`,
+          key: `${formatHeader('quartiles', times)}Quartiles.2`,
           formatter: formatDuration,
-          allowZeros: false
+          allowZeros: false,
+          timingOption: this.timingOption
         },
         {
-          text: `Max T-${times}`,
-          value: `max${times}Time`,
+          title: `Max ${times}`,
+          key: `${formatHeader('max', times)}`,
           formatter: formatDuration,
-          allowZeros: false
+          allowZeros: false,
+          timingOption: this.timingOption
         }
       ]
+      if (this.timingOption === 'cpuTime') {
+        timingHeaders.push({
+          title: 'Total CPU Time',
+          key: 'totalCpuTime',
+          formatter: formatDuration,
+          allowZeros: false,
+          timingOption: this.timingOption
+        })
+      }
       return this.headers.concat(timingHeaders)
     }
-  }
+  },
+
+  methods: {
+    formatCell (item, header) {
+      const arrayMatch = header.key.match(/^(.+)\.(\d+)$/)
+      const key = arrayMatch?.[1] ?? header.key
+      let value = item[key]
+      if (arrayMatch) {
+        const index = arrayMatch[2]
+        value = value[index]
+      }
+      if (header.formatter) {
+        return header.formatter(value, header.allowZeros, this.timingOption)
+      }
+      return value
+    }
+  },
+
+  itemsPerPageOptions: [
+    { value: 10, title: '10' },
+    { value: 20, title: '20' },
+    { value: 50, title: '50' },
+    { value: 100, title: '100' },
+    { value: 200, title: '200' },
+    { value: -1, title: 'All' }
+  ],
 }
 </script>

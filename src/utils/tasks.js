@@ -17,7 +17,9 @@
 
 import TaskState from '@/model/TaskState.model'
 import { TASK_OUTPUT_NAMES } from '@/model/TaskOutput.model'
-
+import {
+  upperFirst
+} from 'lodash'
 /**
  * States used when the parent is stopped.
  * @type {Array<TaskState>}
@@ -109,38 +111,100 @@ function jobMessageOutputs (jobNode) {
  * 00:00:00, rather than undefined
  * @return {string=} Formatted duration
  */
-function formatDuration (dur, allowZeros = false) {
-  if (dur || (dur === 0 && allowZeros === true)) {
-    const seconds = dur % 60
-    const minutes = ((dur - seconds) / 60) % 60
-    const hours = ((dur - minutes * 60 - seconds) / 3600) % 24
-    const days = (dur - hours * 3600 - minutes * 60 - seconds) / 86400
+ function formatDuration (value, allowZeros = false, timingOption = false) {
+  // Smaller number of seconds are formatted as HH:MM:SS
+  if (timingOption === 'queue' || timingOption === 'total' || timingOption === 'run' || timingOption === 'cpuTime') {
+    if (value || (value === 0 && allowZeros === true)) {
+      if (timingOption === 'cpuTime') {
+        value = value / 1000
+      }
+      const seconds = value % 60
+      const minutes = ((value - seconds) / 60) % 60
+      const hours = ((value - minutes * 60 - seconds) / 3600) % 24
+      const days = (value - hours * 3600 - minutes * 60 - seconds) / 86400
 
-    let dayss = ''
-    if (days > 0) {
-      dayss = days.toString() + 'd '
+      let dayss = ''
+      if (days > 0) {
+        dayss = days.toString() + 'd '
+      }
+
+      return dayss +
+        hours.toString().padStart(2, '0') +
+        ':' + minutes.toString().padStart(2, '0') +
+        ':' + Math.round(seconds).toString().padStart(2, '0')
     }
-
-    return dayss +
-      hours.toString().padStart(2, '0') +
-      ':' + minutes.toString().padStart(2, '0') +
-      ':' + Math.round(seconds).toString().padStart(2, '0')
+  // Larger number means it's memory
+  } else if (timingOption === 'maxRss') {
+    if (value / 1024 < 5000) {
+      const kilobytes = value / 1024
+      return kilobytes.toPrecision(3) + ' KB'
+    } else if (value / 1048576 < 1000) {
+      const megabytes = value / 1048576
+      return megabytes.toPrecision(3) + ' MB'
+    } else {
+      const gigabytes = value / 1073741824
+      return gigabytes.toPrecision(3) + ' GB'
+    }
   }
   // the meanElapsedTime can be 0/undefined (i.e. task has not run before)
   // return "undefined" rather than a number for these cases
   return undefined
 }
 
-function dtMean (taskNode) {
+export function formatChartLabels (timingOption) {
+  // Create correct labels for the charts
+  if (timingOption === 'maxRss') {
+    return 'Max RSS'
+  } else {
+    return upperFirst(timingOption) + ' time'
+  }
+}
+
+export function getTimingOption (timingOption) {
+  // Create correct timing option for the charts
+  if (timingOption === 'maxRss' || timingOption === 'cpuTime') {
+    return timingOption
+  } else {
+    return timingOption + 'Time'
+  }
+}
+
+export function formatHeader (statistic, timingOption) {
+  if (timingOption === 'MaxRss' || timingOption === 'CpuTime' || timingOption === 'totalCpuTime') {
+    if (statistic === 'quartiles') {
+      return timingOption.charAt(0).toLowerCase() + timingOption.slice(1)
+    } else {
+      return statistic + timingOption
+    }
+  } else {
+    if (statistic === 'quartiles') {
+      return timingOption.toLowerCase()
+    } else {
+      return statistic + timingOption + 'Time'
+    }
+  }
+}
+
+export function dtMean (taskNode) {
   // Convert to an easily read duration format:
   const dur = taskNode.node?.task?.meanElapsedTime
   return formatDuration(dur)
 }
 
-export {
-  extractGroupState,
-  latestJob,
-  jobMessageOutputs,
-  formatDuration,
-  dtMean
+/**
+ * @param {string} flowNums - Flow numbers in DB format
+ * @returns {string} - Flow numbers in pretty format
+ */
+export function formatFlowNums (flowNums) {
+  return JSON.parse(flowNums).join(', ') || 'None'
+}
+
+/**
+ * Return whether a task is in the None flow.
+ *
+ * @param {string=} flowNums
+ * @returns {boolean}
+ */
+export function isFlowNone (flowNums) {
+  return Boolean(flowNums && !JSON.parse(flowNums).length)
 }
