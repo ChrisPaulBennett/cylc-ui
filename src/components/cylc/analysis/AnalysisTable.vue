@@ -116,13 +116,6 @@ export default {
           timingOption: this.timingOption
         },
         {
-          title: `Std Dev ${times}`,
-          key: `${formatHeader('stdDev', times)}`,
-          formatter: formatDuration,
-          allowZeros: true,
-          timingOption: this.timingOption
-        },
-        {
           title: `Min ${times}`,
           key: `${formatHeader('min', times)}`,
           formatter: formatDuration,
@@ -164,6 +157,16 @@ export default {
           key: 'totalCpuTime',
           formatter: formatDuration,
           allowZeros: false,
+          timingOption: this.timingOption
+        })
+      }
+      // Don't show std dev for cpuTime or maxRss
+      if (this.timingOption !== 'cpuTime' && this.timingOption !== 'maxRss') {
+        timingHeaders.push({
+          title: `Std Dev ${times}`,
+          key: `${formatHeader('stdDev', times)}`,
+          formatter: formatDuration,
+          allowZeros: true,
           timingOption: this.timingOption
         })
       }
