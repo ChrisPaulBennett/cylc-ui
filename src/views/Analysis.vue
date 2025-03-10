@@ -17,6 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="c-analysis">
+    <v-skeleton-loader
+      v-if="!Object.keys(callback.tasks).length"
+      type="table"
+      class="align-content-start"
+    />
     <v-container
     fluid
     class="c-table ma-0 pa-2 h-100 flex-column d-flex"
@@ -75,7 +80,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </v-col>
       </v-row>
-      <ViewToolbar :groups="groups" @setOption="setOption"/>
+      <div
+        ref="toolbar"
+        id="analysis-toolbar"
+        class="d-flex align-center flex-wrap my-2 col-gap-2 row-gap-4"
+      >
+        <!-- Toolbar -->
+        <v-defaults-provider
+          :defaults="{
+            VBtn: { icon: true, variant: 'text' },
+          }"
+        >
+          <v-btn-toggle
+            v-model="chartType"
+            mandatory
+            variant="outlined"
+            color="primary"
+          >
+            <v-btn
+              :value="'table'"
+              data-cy="table-toggle"
+            >
+              <v-icon :icon="$options.icons.mdiTable" />
+              <v-tooltip>Table view</v-tooltip>
+            </v-btn>
+            <v-btn
+              :value="'box'"
+              data-cy="box-plot-toggle"
+            >
+              <v-icon :icon="$options.icons.mdiChartTimeline" />
+              <v-tooltip>Box &amp; whiskers view</v-tooltip>
+            </v-btn>
+            <v-btn
+              :value="'timeSeries'"
+              data-cy="time-series-toggle"
+            >
+              <v-icon :icon="$options.icons.mdiChartTimelineVariant" />
+              <v-tooltip>Time series view</v-tooltip>
+            </v-btn>
+          </v-btn-toggle>
+          <v-btn
+            v-if="chartType === 'table' || chartType === 'box'"
+            @click="tasksQuery"
+            data-cy="analysis-refresh-btn"
+          >
+            <v-icon :icon="$options.icons.mdiRefresh" />
+            <v-tooltip>Refresh data</v-tooltip>
+          </v-btn>
+          <v-chip
+            location="right"
+            v-if="timingOption === 'cpuTime'"
+          >
+            Total CPU Time Of Suite {{ formatDuration(tasks[0].totalOfTotals, false, 'cpuTime') }}
+          </v-chip>
+          <!-- Box plot sort input teleports here -->
+        </v-defaults-provider>
+      </div>
       <AnalysisTable
         v-if="table"
         :tasks="filteredTasks"
@@ -101,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pick from 'lodash/pick'
 import Vue from 'vue'
 import gql from 'graphql-tag'
-import pageMixin from '@/mixins/index'
+import { formatDuration } from '@/utils/tasks'
 import graphqlMixin from '@/mixins/graphql'
 import ViewToolbar from '@/components/cylc/ViewToolbar'
 import BoxPlot from '@/components/cylc/analysis/BoxPlot'
@@ -138,10 +198,20 @@ const taskFields = [
   'meanQueueTime',
   'stdDevQueueTime',
   'minQueueTime',
-  'firstQuartileQueue',
-  'secondQuartileQueue',
-  'thirdQuartileQueue',
-  'maxQueueTime'
+  'queueQuartiles',
+  'maxQueueTime',
+  'maxMaxRss',
+  'meanMaxRss',
+  'stdDevMaxRss',
+  'minMaxRss',
+  'maxRssQuartiles',
+  'maxCpuTime',
+  'meanCpuTime',
+  'stdDevCpuTime',
+  'minCpuTime',
+  'totalCpuTime',
+  'cpuTimeQuartiles',
+  'totalOfTotals'
 ]
 
 /** The one-off query which retrieves historical task timing statistics */
@@ -286,18 +356,38 @@ export default {
     }
   },
   methods: {
-    async historicalQuery () {
-      this.tasks = []
-      this.callback = new AnalysisCallback(this.tasks)
-      const ret = await this.$workflowService.query2(
-        QUERY,
-        { workflows: this.workflowIDs }
-      )
-      this.callback.onAdded(ret.data)
-    },
-    setOption (option, value) {
-      Vue.set(this, option, value)
-    }
-  }
+    /**
+     * Run the one-off query for historical task data and pass its results
+     * through the callback
+     */
+    tasksQuery: debounce(
+      async function () {
+        this.tasks = []
+        this.callback = new AnalysisTaskCallback(this.tasks)
+        const ret = await this.$workflowService.query2(
+          TASK_QUERY,
+          { workflows: this.workflowIDs }
+        )
+        this.callback.onAdded(ret.data)
+      },
+      200 // only re-run this once every 0.2 seconds
+    ),
+    formatDuration
+  },
+
+  icons: {
+    mdiChartTimeline,
+    mdiChartTimelineVariant,
+    mdiRefresh,
+    mdiTable,
+  },
+
+  timingOptions: [
+    { value: 'totalTimes', title: 'Total times' },
+    { value: 'runTimes', title: 'Run times' },
+    { value: 'queueTimes', title: 'Queue times' },
+    { value: 'maxRss', title: 'Max RSS' },
+    { value: 'cpuTime', title: 'CPU Time' },
+  ],
 }
 </script>
