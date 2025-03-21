@@ -22,11 +22,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script>
-import Vue from 'vue'
-import VueApexCharts from 'vue-apexcharts'
-
-Vue.use(VueApexCharts)
-Vue.component('apexchart', VueApexCharts)
+import { computed } from 'vue'
+import VueApexCharts from 'vue3-apexcharts'
+import {
+  mdiDownload,
+  mdiSortReverseVariant,
+  mdiSortVariant,
+} from '@mdi/js'
+import { upperFirst } from 'lodash'
+import {
+  formatDuration,
+  getTimingOption,
+  formatChartLabels
+} from '@/utils/tasks'
+import { useReducedAnimation } from '@/composables/localStorage'
+import {
+  initialOptions,
+  updateInitialOptionsEvent,
+  useInitialOptions
+} from '@/utils/initialOptions'
 
 export default {
 
@@ -168,7 +182,30 @@ export default {
           ],
         })
       }
-      return chartOptions
+      return [{ data }]
+    },
+
+    numPages () {
+      return Math.ceil(this.tasks.length / this.itemsPerPage) || 1
+    },
+
+    sortChoices () {
+      return [
+        { title: 'Task name', value: 'name' },
+        { title: 'Platform', value: 'platform' },
+        { title: 'Count', value: 'count' },
+        { title: `Mean ${formatChartLabels(this.timingOption)}`, value: `mean${upperFirst(getTimingOption(this.timingOption))}` },
+        { title: `Median ${formatChartLabels(this.timingOption)}`, value: `median${upperFirst(getTimingOption(this.timingOption))}` },
+        { title: `Min ${formatChartLabels(this.timingOption)}`, value: `min${upperFirst(getTimingOption(this.timingOption))}` },
+        { title: `Max ${formatChartLabels(this.timingOption)}`, value: `max${upperFirst(getTimingOption(this.timingOption))}` },
+      ]
+    },
+  },
+
+  watch: {
+    numPages () {
+      // Clamp page number
+      this.page = Math.min(this.numPages, this.page)
     }
   },
   methods: {
