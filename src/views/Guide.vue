@@ -86,6 +86,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
           </v-card-text>
         </v-card>
+
+        <br />
+
+        <v-card variant="outlined" class="pa-1">
+          <v-card-title primary-title>
+            <p class="text-h4 text--primary">Skip Mode?</p>
+          </v-card-title>
+          <v-card-text>
+            <p>
+              Tasks can be configured to skip rather than run. These tasks are
+              marked with a special icon proving they are not otherwise held
+              back from running by some other factor (e.g, if they are held).
+            </p>
+            <v-list
+               lines="three"
+            >
+              <v-list-item>
+                <template v-slot:prepend>
+                  <task
+                    style="font-size: 2em;"
+                    :task="{state: 'waiting', runtime: { runMode: 'Skip' }}"
+                    class="mr-4"
+                  />
+                </template>
+                <v-list-item-title>
+                  Skip Mode
+                </v-list-item-title>
+                <v-list-item-subtitle>
+                  This task will be run in skip mode.
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+        </v-card>
       </v-col>
 
       <v-col>
@@ -113,7 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </v-list-item-title>
                 <v-list-item-subtitle>
                   The task is not ready to run yet - it is still waiting on
-                  upstream <b>dependencies</b> or <b>xtriggers</b>.
+                  upstream <b>dependencies</b> (or old style
+                  external triggers).
                 </v-list-item-subtitle>
               </v-list-item>
               <v-list-item>
@@ -137,6 +172,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:prepend>
                   <task
                     style="font-size: 2em;"
+                    :task="{state: 'waiting', isRunahead: true}"
+                    class="mr-4"
+                  />
+                </template>
+                <v-list-item-title>
+                  Runahead
+                </v-list-item-title>
+                <v-list-item-subtitle>
+                  The task is ready to run but is beyond the runahead limit,
+                  which restricts the number of active cycle points.
+                </v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item>
+                <template v-slot:prepend>
+                  <task
+                    style="font-size: 2em;"
                     :task="{state: 'waiting', isQueued: true}"
                     class="mr-4"
                   />
@@ -153,16 +204,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:prepend>
                   <task
                     style="font-size: 2em;"
-                    :task="{state: 'waiting', isRunahead: true}"
+                    :task="{state: 'waiting', isRetry: true}"
                     class="mr-4"
                   />
                 </template>
                 <v-list-item-title>
-                  Runahead
+                  Retry
                 </v-list-item-title>
                 <v-list-item-subtitle>
-                  The task is ready to run but is beyond the runahead limit,
-                  which restricts the number of active cycle points.
+                  The task is waiting to retry running after
+                  a configured <b>submission or execution retry delay</b>.
+                  It will then attempt to run the job again.
+                </v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item>
+                <template v-slot:prepend>
+                  <task
+                    style="font-size: 2em;"
+                    :task="{state: 'waiting', isWallclock: true}"
+                    class="mr-4"
+                  />
+                </template>
+                <v-list-item-title>
+                  Wallclock
+                </v-list-item-title>
+                <v-list-item-subtitle>
+                  This task is waiting for a wallclock trigger.
+                </v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item>
+                <template v-slot:prepend>
+                  <task
+                    style="font-size: 2em;"
+                    :task="{state: 'waiting', isXtriggered: true}"
+                    class="mr-4"
+                  />
+                </template>
+                <v-list-item-title>
+                  Xtriggered
+                </v-list-item-title>
+                <v-list-item-subtitle>
+                  This task is waiting for an <b>xtrigger</b>.
                 </v-list-item-subtitle>
               </v-list-item>
             </v-list>
@@ -170,10 +252,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <em>Note: tasks downstream of queued (or runahead limited) tasks
                are not themselves shown as queued (or runahead limited)
                because they are not otherwise ready to run yet.</em>
-             </p>
-            <p>
-              <em>Note: external triggers (e.g. clock triggers) are not yet
-               exposed in the UI.</em>
              </p>
           </v-card-text>
         </v-card>

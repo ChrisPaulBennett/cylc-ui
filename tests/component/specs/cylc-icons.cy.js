@@ -45,7 +45,7 @@ const TaskComponent = defineComponent({
   render () {
     return h(
       'span',
-      { style: 'font-size: 200px; margin: 100px;' },
+      { style: 'font-size: 200px; margin-left: 100px; margin-top: 50px; display: inline-block' },
       [
         h(Task, this.$attrs)
       ]
@@ -56,14 +56,22 @@ const TaskComponent = defineComponent({
 function makeTask (
   state = 'waiting',
   isHeld = false,
+  isRunahead = false,
+  runtime = { runMode: 'Live' },
   isQueued = false,
-  isRunahead = false
+  isRetry = false,
+  isWallclock = false,
+  isXtriggered = false,
 ) {
   return {
     state,
     isHeld,
-    isQueued,
     isRunahead,
+    runtime,
+    isQueued,
+    isRetry,
+    isWallclock,
+    isXtriggered,
     task: {
       meanElapsedTime: MEAN_ELAPSED_TIME // NOTE time in seconds
     }
@@ -117,16 +125,31 @@ describe('Task component', () => {
   })
   it('Renders for each task modifier', () => {
     let task
-    for (const modifier of ['isHeld', 'isQueued', 'isRunahead']) {
+    for (const modifier of [
+      'isHeld',
+      'isRunahead',
+      'skip',
+      'isQueued',
+      'isXtriggered',
+      'isRetry',
+      'isWallclock'
+    ]) {
       task = makeTask()
-      task[modifier] = true
+      let filename
+      if (modifier === 'skip') {
+        task.runtime.runMode = 'Skip'
+        filename = 'isSkip'
+      } else {
+        task[modifier] = true
+        filename = modifier
+      }
       cy.mount(TaskComponent, { props: { task } })
       cy.get('.c8-task').last().screenshot(
-        `task-${modifier}`,
+        `task-${filename}`,
         {
           overwrite: true,
           disableTimersAndAnimations: false,
-          padding: [10, 5, 5, 10]
+          padding: [10, 10, 15, 10]
         }
       )
     }

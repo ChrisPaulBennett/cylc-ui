@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) NIWA & British Crown (Met Office) & Contributors.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@ import { TASK_OUTPUT_NAMES } from '@/model/TaskOutput.model'
 
 /**
  * States used when the parent is stopped.
- * @type {Array<TaskState>}
+ * @type {TaskState[]}
  */
 const isStoppedOrderedStates = [
   TaskState.SUBMIT_FAILED,
@@ -35,12 +35,12 @@ const isStoppedOrderedStates = [
 
 /**
  * Gives a single state, based on a list of states of children nodes.
- * @param childStates {Array<TaskState>} children nodes
- * @param isStopped {boolean} whether the parent node is stopped or not
- * @returns {string} a valid Task State name, or null if not found
+ * @param {TaskState[]} childStates children nodes
+ * @param {boolean} isStopped whether the parent node is stopped or not
+ * @returns {string} a valid Task State name, or empty string if not found
  * @link @see https://github.com/cylc/cylc-flow/blob/d66ae5c3ce8c749c8178d1cd53cb8c81d1560346/lib/cylc/task_state_prop.py
  */
-function extractGroupState (childStates, isStopped = false) {
+export function extractGroupState (childStates, isStopped = false) {
   const states = isStopped ? isStoppedOrderedStates : TaskState.enumValues
   for (const state of states) {
     if (childStates.includes(state.name)) {
@@ -50,11 +50,8 @@ function extractGroupState (childStates, isStopped = false) {
   return ''
 }
 
-function latestJob (taskProxy) {
-  if (taskProxy && taskProxy.children && taskProxy.children.length > 0) {
-    return taskProxy.children[0].node
-  }
-  return null
+export function latestJob (taskProxy) {
+  return taskProxy?.children?.[0]?.node
 }
 
 /** Returns an array of task messages and custom outputs for a job node.
@@ -70,32 +67,22 @@ function latestJob (taskProxy) {
  *   }
  * }
  */
-function jobMessageOutputs (jobNode) {
+export function jobMessageOutputs (jobNode) {
   const ret = []
-  let messageOutput
 
   for (const message of jobNode.node.messages || []) {
     if (TASK_OUTPUT_NAMES.includes(message)) {
       continue
     }
-    messageOutput = null
-    for (const output of jobNode.node.taskProxy?.outputs || []) {
-      if (message === output.label) {
-        messageOutput = output
-        break
-      }
-    }
-    if (messageOutput) {
-      // add an output to the list
-      ret.push(messageOutput)
-    } else {
-      // add a message to the list and make it look like an output
-      ret.push({
-        label: message,
-        message: `Task Message: ${message}`,
-        isMessage: true
-      })
-    }
+    const messageOutput = jobNode.node.taskProxy?.outputs?.find(
+      (output) => message === output.message
+    )
+    ret.push({
+      level: undefined, // TODO: https://github.com/cylc/cylc-ui/pull/1436
+      label: messageOutput?.label,
+      message: messageOutput?.message ?? message,
+      isMessage: !messageOutput,
+    })
   }
   return ret
 }
@@ -105,11 +92,12 @@ function jobMessageOutputs (jobNode) {
  * Durations of 0 seconds return undefined unless allowZeros is true
  *
  * @param {number=} dur Duration in seconds
- * @param {boolean} [allowZeros=false] Whether durations of 0 are formatted as
+ * @param {Object} [options]
+ * @param {boolean} [options.allowZeros] Whether durations of 0 are formatted as
  * 00:00:00, rather than undefined
  * @return {string=} Formatted duration
  */
-function formatDuration (dur, allowZeros = false) {
+export function formatDuration (dur, { allowZeros = false } = {}) {
   if (dur || (dur === 0 && allowZeros === true)) {
     const seconds = dur % 60
     const minutes = ((dur - seconds) / 60) % 60
@@ -131,16 +119,43 @@ function formatDuration (dur, allowZeros = false) {
   return undefined
 }
 
-function dtMean (taskNode) {
-  // Convert to an easily read duration format:
-  const dur = taskNode.node?.task?.meanElapsedTime
-  return formatDuration(dur)
+/**
+ * Return the run time of a job node in seconds.
+ */
+export function getRunTime (jobNode) {
+  if (jobNode?.startedTime && jobNode?.finishedTime) {
+    return (new Date(jobNode.finishedTime) - new Date(jobNode.startedTime)) / 1000
+  }
 }
 
-export {
-  extractGroupState,
-  latestJob,
-  jobMessageOutputs,
-  formatDuration,
-  dtMean
+/**
+ * Format a datetime as an ISO 8601 string in UTC, without milliseconds.
+ *
+ * @param {Date} date - The date to format.
+ * @returns {string} The formatted date string.
+ */
+export function formatDatetime (date) {
+  return `${date.toISOString().slice(0, -5)}Z`
+}
+
+/**
+ * @param {string} flowNums - Flow numbers in DB format
+ * @returns {string} - Flow numbers in pretty format
+ */
+export function formatFlowNums (flowNums) {
+  return JSON.parse(flowNums).join(', ') || 'None'
+}
+
+/**
+ * Return whether a task is in the None flow.
+ *
+ * @param {string=} flowNums
+ * @returns {boolean}
+ */
+export function isFlowNone (flowNums) {
+  return Boolean(flowNums && !JSON.parse(flowNums).length)
+}
+
+export function isTruthyOrZero (value) {
+  return value === 0 || Boolean(value)
 }

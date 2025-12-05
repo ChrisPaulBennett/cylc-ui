@@ -18,6 +18,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vuetify from 'vite-plugin-vuetify'
+import react from '@vitejs/plugin-react'
 import eslint from 'vite-plugin-eslint'
 import IstanbulPlugin from 'vite-plugin-istanbul'
 import dns from 'dns'
@@ -33,6 +34,8 @@ export default defineConfig(({ mode }) => {
     eslint({
       failOnError: mode === 'production'
     }),
+    // GraphiQL is a React app:
+    react(),
   ]
 
   if (mode !== 'production' && process.env.COVERAGE) {
@@ -56,6 +59,7 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
         $tests: path.resolve(__dirname, './tests'),
         lodash: 'lodash-es',
+        // GraphiQL is a React app (use Preact as it's smaller):
         react: 'preact/compat',
         'react-dom': 'preact/compat',
       }
@@ -72,7 +76,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        '^/(userprofile|graphql)': {
+        '^/(userprofile|version|graphql)': {
           target: devProxyTarget,
           changeOrigin: true
         },
@@ -98,9 +102,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: mode !== 'production',
-      // Use default browser compatibility for ECMAScript syntax as it's
-      // good enough:
-      target: 'modules',
+      target: 'baseline-widely-available',
       rollupOptions: {
         // Workaround https://github.com/vitejs/vite/issues/19410:
         maxParallelFileOps: 100,
@@ -133,7 +135,7 @@ export default defineConfig(({ mode }) => {
       coverage: {
         provider: 'istanbul',
         include: [
-          'src/**'
+          'src/**/*.{js,mjs,jsx,ts,tsx,vue}',
         ],
         exclude: [
           'src/services/mock/**'

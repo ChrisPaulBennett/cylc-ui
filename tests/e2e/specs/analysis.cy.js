@@ -58,7 +58,10 @@ describe('Analysis view', () => {
         .should('be.visible')
       cy
         .get('#c-analysis-filter-task-name')
-        .type('wait')
+        .click()
+          .get('.v-list-item')
+          .contains('waiting')
+          .click({ force: true })
       cy
         .get('td')
         .contains('waiting')
@@ -182,7 +185,10 @@ describe('Analysis view', () => {
       // Show task names containing 'wait'
       cy
         .get('#c-analysis-filter-task-name')
-        .type('wait')
+        .click()
+          .get('.v-list-item')
+          .contains('waiting')
+          .click({ force: true })
       cy
         .get('td')
         .contains('waiting')
@@ -226,8 +232,18 @@ describe('Analysis view', () => {
         .contains('waiting')
         .should('be.visible')
       cy
-        .get('.c-analysis table > tbody > tr')
-        .should('have.length', 1)
+        .get('[data-cy=time-series-task-select]')
+        .click()
+        .get('.v-list-item')
+        .its('length')
+        .should('eq', 3, { timeout: 10000 })
+    })
+
+    it('Should switch view', () => {
+      // Check for axis labels - should be no data plotted and only
+      // y-axis labels visible
+      cy
+        .get('.vue-apexcharts')
         .should('be.visible')
     })
     it('Should filter by task platform', () => {
@@ -241,9 +257,18 @@ describe('Analysis view', () => {
         .contains('platform_1')
         .should('be.visible')
       cy
-        .get('#c-analysis-filter-task-platforms')
-        .click({ force: true })
+        .get('[data-cy=time-series-task-select]')
+        .click()
+        .get('.v-list-item')
+        .contains('waiting')
+        .click()
       cy
+        .get('.apexcharts-xaxis-label')
+        .should('have.length', 4)
+        // Add eventually_succeeded task and check three cycles visible
+      cy
+        .get('[data-cy=time-series-task-select]')
+        .click()
         .get('.v-list-item')
         .contains('platform_2')
         .click({ force: true })
@@ -263,36 +288,98 @@ describe('Analysis view', () => {
         .should('have.length', 3)
         .should('be.visible')
       cy
-        .get('td')
-        .contains('00:00:30')
-        .should('be.visible')
-      // Show run times
-      cy
-        .get('#c-analysis-filter-task-timings')
-        .click({ force: true })
-      cy
+        .get('[data-cy=time-series-task-select]')
+        .click()
         .get('.v-list-item')
         .contains('Run')
         .click({ force: true })
       cy
-        .get('td')
-        .contains('00:00:21')
-        .should('be.visible')
+        .get('[data-cy=time-series-task-select]')
+        .click()
+        .get('.v-list-item')
+        .contains('succeeded')
+        .get('.v-card-actions')
+        .contains('Select all')
+        .should('exist')
+        .get('.v-card-actions')
+        .contains('Deselect all')
+        .should('exist')
+      // Select all tasks that contain succeeded
       cy
-        .get('.c-analysis table > tbody > tr')
-        .should('have.length', 3)
-        .should('be.visible')
-      // Show queue times
+        .get('[data-cy=time-series-task-select]')
+        .type('succeeded')
+        .get('.v-card-actions')
+        .contains('Select all')
+        .click()
+      // Check the correct tasks have been added
       cy
-        .get('#c-analysis-filter-task-timings')
-        .click({ force: true })
+        .get('[data-cy=time-series-task-select]')
+        .find('.v-chip')
+        .its('length')
+        .should('eq', 2)
+        .get('[data-cy=time-series-task-select]')
+        .find('.v-chip')
+        .contains(/^succeeded$/)
+        .get('[data-cy=time-series-task-select]')
+        .find('.v-chip')
+        .contains('eventually_succeeded')
+      // Remove all tasks that contain eventually
       cy
+        .get('[data-cy=time-series-task-select]')
+        .find('input')
+        .clear()
+        .type('eventually')
+        .get('.v-card-actions')
+        .contains('Deselect all')
+        .click()
+      // Check only succeeded task is selected
+      cy
+        .get('[data-cy=time-series-task-select]')
+        .find('.v-chip')
+        .contains(/^succeeded$/)
+        .get('[data-cy=time-series-task-select]')
+        .find('.v-chip')
+        .contains('eventually_succeeded')
+        .should('not.exist')
+    })
+
+    it('Should show origin, when selected', () => {
+      // Add waiting task and check y-axis doesn't start at origin
+      cy
+        .get('[data-cy=time-series-task-select]')
+        .click()
         .get('.v-list-item')
         .contains('Queue')
         .click({ force: true })
       cy
-        .get('td')
-        .contains('00:00:12')
+        .get('.v-selection-control > .v-label')
+        .click()
+      cy
+        .get('.apexcharts-yaxis-label')
+        .contains('00:00:00')
+    })
+  })
+})
+
+function addView (view) {
+  cy.get('[data-cy=add-view-btn]').click()
+  cy.get(`#toolbar-add-${view}-view`).click()
+    // wait for menu to close
+    .should('not.be.exist')
+}
+
+describe('Filters and Options save state', () => {
+  const numTasks = sortedTasks.length
+  describe('Options save state', () => {
+    beforeEach(() => {
+      cy.visit('/#/workspace/one')
+      addView('Analysis')
+    })
+
+    it('remembers table and box & whiskers toggle option when switching between workflows', () => {
+      cy.get('.c-analysis [data-cy=box-plot-toggle]')
+        .click()
+        .get('.vue-apexcharts')
         .should('be.visible')
       cy
         .get('.c-analysis table > tbody > tr')
@@ -318,14 +405,13 @@ describe('Analysis view', () => {
         .contains('platform_1')
         .click({ force: true })
       cy
-        .get('td')
+        .get('#c-analysis-filter-task-name')
+        .click()
+        .get('.v-list-item')
         .contains('waiting')
-        .should('be.visible')
-      cy
-        .get('.c-analysis table > tbody > tr')
-        .should('have.length', 2)
-        .should('be.visible')
-      // Show run times
+        .click({ force: true })
+
+      // Set task times filter options
       cy
         .get('#c-analysis-filter-task-timings')
         .click({ force: true })
@@ -368,6 +454,14 @@ describe('Analysis view', () => {
       cy
         .get('.c-analysis table > tbody > tr')
         .should('have.length', 1)
+        .should('be.visible')
+    })
+
+    it('shows sorting controls in correct tab', () => {
+      addView('Analysis') // second analysis view
+      cy.get('.c-analysis [data-cy=box-plot-toggle]:last')
+        .click()
+        .get('[data-cy="box-plot-sort-select"]')
         .should('be.visible')
     })
   })

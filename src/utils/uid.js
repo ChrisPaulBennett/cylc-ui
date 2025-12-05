@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) NIWA & British Crown (Met Office) & Contributors.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -123,7 +123,12 @@ const RELATIVE_ID = new RegExp(`
 
 /* eslint-enable */
 
-function detokenise (tokens, workflow = true, relative = true) {
+const JOB_ID = /^(\d+|NN)$/
+
+export function detokenise (
+  tokens,
+  { workflow, relative } = { workflow: true, relative: true }
+) {
   let parts = []
   let ret = ''
 
@@ -134,10 +139,8 @@ function detokenise (tokens, workflow = true, relative = true) {
     if (tokens.workflow) {
       parts.push(tokens.workflow)
     }
-    if (parts) {
-      ret = parts.join('/')
-      parts = []
-    }
+    ret = parts.join('/')
+    parts = []
   }
 
   if (relative) {
@@ -159,7 +162,7 @@ function detokenise (tokens, workflow = true, relative = true) {
   return ret
 }
 
-class Tokens {
+export class Tokens {
   /* Represents a Cylc UID.
    *
    * Provides the interfaces for parsing to and from string IDs.
@@ -194,7 +197,7 @@ class Tokens {
     let task
     let job
 
-    if (id === null) {
+    if (id == null) {
       throw new Error(`Invalid ID ${id}`)
     }
 
@@ -262,19 +265,29 @@ class Tokens {
       this.job = undefined
     }
 
-    this.workflowID = detokenise(this, true, false)
-    this.relativeID = detokenise(this, false, true)
+    if (this.job && !JOB_ID.test(this.job)) {
+      throw new Error(`Invalid job ID: ${this.job}`)
+    }
+
+    this.workflowID = detokenise(this, { workflow: true })
+    this.relativeID = detokenise(this, { relative: true })
   }
 
   set (fields) {
-    for (const [key, value] of Object.entries(fields)) {
-      if (Tokens.KEYS.indexOf(key) === -1) {
-        throw new Error(`Invalid key: ${key}`)
+    if (fields instanceof Tokens) {
+      for (const key of Tokens.KEYS) {
+        if (fields[key]) this[key] = fields[key]
       }
-      if (typeof value !== 'string' && typeof value !== 'undefined') {
-        throw new Error(`Invalid type for value: ${value}`)
+    } else {
+      for (const [key, value] of Object.entries(fields)) {
+        if (!Tokens.KEYS.includes(key)) {
+          throw new Error(`Invalid key: ${key}`)
+        }
+        if (typeof value !== 'string' && value != null) {
+          throw new Error(`Invalid type for value: ${value}`)
+        }
+        this[key] = value ?? undefined
       }
-      this[key] = value
     }
     this.compute()
   }
@@ -360,6 +373,19 @@ class Tokens {
     }
     return ret
   }
-}
 
-export { Tokens }
+  /**
+   * Validate an ID string without throwing an error.
+   *
+   * @param {string} id
+   * @returns {string=} Error message if invalid, otherwise nothing.
+   */
+  static validate (id, relative = false) {
+    try {
+      // eslint-disable-next-line no-new
+      new Tokens(id, relative)
+    } catch (e) {
+      return e.message
+    }
+  }
+}

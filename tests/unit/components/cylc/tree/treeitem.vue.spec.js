@@ -77,7 +77,6 @@ describe('TreeItem component', () => {
   })
 
   describe('expanded', () => {
-    // using simpleJobNode as it has only one child so it is easier/quicker to test
     it.each([
       [simpleCyclepointNode, true],
       [simpleTaskNode, false],
@@ -117,7 +116,7 @@ describe('TreeItem component', () => {
   describe('children', () => {
     it.each([
       { autoExpandTypes: undefined, expected: ['CyclePoint', 'TaskProxy'] },
-      { autoExpandTypes: ['workflow', 'cycle', 'family', 'task'], expected: ['CyclePoint', 'TaskProxy', 'Job'] },
+      { autoExpandTypes: ['workflow', 'cycle', 'family', 'task'], expected: ['CyclePoint', 'TaskProxy', 'Job', 'Job'] },
       { autoExpandTypes: ['workflow'], expected: ['CyclePoint'] },
       { autoExpandTypes: [], expected: [] },
     ])('recursively mounts child TreeItems ($autoExpandTypes)', ({ autoExpandTypes, expected }) => {
@@ -152,13 +151,12 @@ describe('GScanTreeItem', () => {
         filteredOutNodesCache: new WeakMap(),
       }
     })
-    it('combines all descendant tasks', () => {
-      expect(wrapper.vm.descendantTaskInfo.latestTasks.submitted.length).to.equal(10)
-      expect(wrapper.vm.descendantTaskInfo.latestTasks.running.length).to.equal(10)
+    it('does not combine descendant latest state tasks', () => {
+      expect(wrapper.vm.statesInfo.latestTasks).to.deep.equal({})
     })
     it('combines all descendant task totals', () => {
-      expect(wrapper.vm.descendantTaskInfo.stateTotals.submitted).to.equal(5)
-      expect(wrapper.vm.descendantTaskInfo.stateTotals.running).to.equal(12)
+      expect(wrapper.vm.statesInfo.stateTotals.submitted).to.equal(5)
+      expect(wrapper.vm.statesInfo.stateTotals.running).to.equal(12)
     })
     it('collapses to the lowest only-child', () => {
       expect(wrapper.vm.node.id).to.equal('~cylc/double/mid')

@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) NIWA & British Crown (Met Office) & Contributors.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -28,7 +28,7 @@ import { eventBus } from '@/services/eventBus'
  * Events in the widget will be propagated to the Vue component. Event
  * listeners much be attached to the DOM element with the widget ID.
  */
-export default class LuminoWidget extends Widget {
+export class LuminoWidget extends Widget {
   /**
    * Create a LuminoWidget object.
    * @param {string} id - unique ID of the widget
@@ -66,6 +66,10 @@ export default class LuminoWidget extends Widget {
     // which cause the tab panel to be updated.
     this.title.label = this.name
     this.title.closable = this.closable
+    eventBus.on(`lumino:update-tab:${this.id}`, ({ title, caption }) => {
+      this.title.label = title
+      this.title.caption = caption
+    })
     super.onBeforeAttach(msg)
   }
 
@@ -79,6 +83,7 @@ export default class LuminoWidget extends Widget {
   onCloseRequest (msg) {
     // Emit an event so that the Vue component knows that it needs to be removed too
     eventBus.emit('lumino:deleted', this.id)
+    eventBus.off(`lumino:update-tab:${this.id}`)
     super.onCloseRequest(msg)
   }
 
@@ -86,5 +91,26 @@ export default class LuminoWidget extends Widget {
     // Emit an event so that the Vue component knows that this widget is visible again
     eventBus.emit(`lumino:show:${this.id}`)
     super.onAfterShow(msg)
+  }
+
+  toJSON () {
+    // Allow the widget to be serialized.
+    // We only need to store this limited info when saving the layout,
+    // allowing us to entirely recreate the widget when restoring the layout.
+    return {
+      name: this.name,
+      id: this.id,
+      closable: this.closable,
+    }
+  }
+
+  /**
+   * JSON.parse reviver function for reconstructing a serialized Lumino ILayoutConfig.
+   */
+  static layoutReviver (key, value) {
+    if (key === 'widgets') {
+      return value.map((w) => new LuminoWidget(w.id, w.name, w.closable))
+    }
+    return value
   }
 }

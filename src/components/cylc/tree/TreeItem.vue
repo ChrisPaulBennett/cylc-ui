@@ -91,6 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <span class="mx-1">{{ node.name }}</span>
+            <span
+              v-if="!isExpanded && latestJob(node)?.platform"
+              class="mx-1 text-grey"
+            >
+              {{ latestJob(node)?.platform }}
+            </span>
             <FlowNumsChip :flowNums="node.node.flowNums"/>
           </div>
           <template v-else-if="node.type === 'job'">
@@ -115,9 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="`${customOutput.label}-${index}`"
                   :class="customOutput.isMessage ? 'bg-light-grey text-black' : 'bg-grey text-white'"
                   class="message-output"
+                  v-tooltip="customOutput.isMessage ? `Task message: ${customOutput.message}` : customOutput.message"
                 >
-                  {{ customOutput.label }}
-                  <v-tooltip :text="customOutput.message"/>
+                  {{ customOutput.isMessage ? customOutput.message : customOutput.label }}
                 </v-chip>
                 <v-chip
                   v-if="jobMessageOutputs.length > 5"
@@ -142,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="child">
         <!-- Need v-if to prevent render of fallback content when slot is provided but is empty -->
         <template v-if="!$slots.child">
-          <JobDetails
+          <JobLeaf
             v-if="node.type === 'job'"
             v-bind="{ node, meanElapsedTime }"
             :depth="depth + 1"
@@ -169,14 +175,14 @@ import {
 } from '@mdi/js'
 import Task from '@/components/cylc/Task.vue'
 import Job from '@/components/cylc/Job.vue'
-import JobDetails from '@/components/cylc/tree/JobDetails.vue'
+import JobLeaf from '@/components/cylc/tree/JobLeaf.vue'
 import {
   jobMessageOutputs,
   latestJob,
   isFlowNone,
 } from '@/utils/tasks'
 import { getIndent, getNodeChildren } from '@/components/cylc/tree/util'
-import { once } from '@/utils'
+import { once } from '@/utils/reactivity'
 import { useToggle } from '@vueuse/core'
 import FlowNumsChip from '@/components/cylc/common/FlowNumsChip.vue'
 
@@ -187,7 +193,7 @@ export default {
     FlowNumsChip,
     Task,
     Job,
-    JobDetails,
+    JobLeaf,
   },
 
   props: {

@@ -45,7 +45,7 @@
             "submit-failed": 0,
             "submitted": 0,
             "running": 0,
-            "failed": 0,
+            "failed": 1,
             "succeeded": 0
           },
           "latestStateTasks": {},
@@ -65,6 +65,7 @@
           "statusMsg": "paused",
           "owner": "user",
           "host": "ncc1701.starfleet.gov",
+          "cylcVersion": "8.5.0.dev",
           "port": 43078,
           "stateTotals": {
             "waiting": 2,
@@ -72,7 +73,7 @@
             "preparing": 0,
             "submit-failed": 0,
             "submitted": 0,
-            "running": 0,
+            "running": 3,
             "failed": 0,
             "succeeded": 0
           },
@@ -83,6 +84,20 @@
             "submitted": [],
             "running": []
           },
+          "logRecords": [
+            {
+              "level": "CRITICAL",
+              "message": "Workflow underwent a sudden and gratuitous total existence failure"
+            },
+            {
+              "level": "ERROR",
+              "message": "SOS"
+            },
+            {
+              "level": "WARNING",
+              "message": "Reality may go on the blink at infinite improbability."
+            }
+          ],
           "__typename": "Workflow"
         },
         "cyclePoints": [

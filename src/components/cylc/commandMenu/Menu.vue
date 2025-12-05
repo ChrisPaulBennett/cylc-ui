@@ -128,6 +128,25 @@ import { eventBus } from '@/services/eventBus'
 import CopyBtn from '@/components/core/CopyBtn.vue'
 import { upperFirst } from 'lodash-es'
 import { formatFlowNums } from '@/utils/tasks'
+import { getJobLogFileFromState } from '@/model/JobState.model'
+
+/**
+ * Return the appropriate log file for a job or task node, or nothing for other nodes.
+ *
+ * @param {Object} node - Cylc object node (i.e. workflow, cycle, family, task or job)
+ */
+export function getLogFileForNode (node) {
+  let jobState
+  if (node.type === 'job') {
+    jobState = node.node.state
+  } else if (node.type === 'task') {
+    // Choose latest job (jobs are sorted by submit num descending in the store)
+    jobState = node.children[0]?.node.state
+  } else {
+    return
+  }
+  return getJobLogFileFromState(jobState)
+}
 
 export default {
   name: 'CommandMenu',
@@ -207,17 +226,18 @@ export default {
         ret += ' • '
         if (this.node.type === 'workflow') {
           ret += upperFirst(this.node.node.statusMsg || this.node.node.status || 'state unknown')
+          if (this.node.node.cylcVersion) {
+            ret += ` • Cylc ${this.node.node.cylcVersion}`
+          }
         } else {
           ret += upperFirst(this.node.node.state || 'state unknown')
-          if (this.node.node.isHeld) {
-            ret += ' (held)'
-          }
-          if (this.node.node.isQueued) {
-            ret += ' (queued)'
-          }
-          if (this.node.node.isRunahead) {
-            ret += ' (runahead)'
-          }
+          if (this.node.node.isHeld) ret += ' (held)'
+          if (this.node.node.isRunahead) ret += ' (beyond runahead limit)'
+          if (this.node.node.runtime?.runMode === 'Skip') ret += ' (skip mode)'
+          if (this.node.node.isQueued) ret += ' (queued)'
+          if (this.node.node.isRetry) ret += ' (awaiting retry)'
+          else if (this.node.node.isWallclock) ret += ' (awaiting wallclock)'
+          else if (this.node.node.isXtriggered) ret += ' (awaiting xtrigger)'
           if (this.node.node.flowNums) {
             ret += ` • Flows: ${formatFlowNums(this.node.node.flowNums)}`
           }
@@ -271,7 +291,8 @@ export default {
             {
               name: 'Log',
               initialOptions: {
-                relativeID: this.node.tokens.relativeID || null
+                relativeID: this.node.tokens.relativeID || null,
+                file: getLogFileForNode(this.node),
               }
             }
           )
@@ -315,13 +336,8 @@ export default {
       // displayed in the menu (this is what the skeleton-loader is for)
       this.isLoadingMutations = false
       this.types = types
-      let type = this.node.type
-      if (type === 'family') {
-        // show the same mutation list for families as for tasks
-        type = 'task'
-      }
       this.mutations = filterAssociations(
-        type,
+        this.node.type,
         this.node.tokens,
         mutations,
         this.user.permissions

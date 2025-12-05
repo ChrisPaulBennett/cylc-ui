@@ -60,10 +60,11 @@ fragment WorkflowData on Workflow {
   id
   status
   statusMsg
-  owner
-  host
-  port
   stateTotals
+  logRecords {
+    level
+    message
+  }
   latestStateTasks(states: [
     "failed",
     "preparing",
@@ -82,7 +83,7 @@ export default {
   ],
 
   components: {
-    GScan
+    GScan,
   },
 
   data () {

@@ -65,11 +65,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="jobLog"
             data-cy="job-id-input"
             class="flex-grow-1 flex-column"
-            :model-value="relativeID"
-            @update:modelValue="debouncedUpdateRelativeID"
+            v-model="inputID"
+            :rules="[validateInputID]"
             placeholder="cycle/task/job"
             clearable
-          />
+          >
+            <template #prepend-inner>
+              <v-btn
+                :disabled="!relativeTokens || jobNode === false"
+                v-bind="toolbarBtnProps"
+                size="medium"
+                variant="plain"
+                @click="() => jobNode ?? fetchJobData()"
+                data-cy="job-info-btn"
+              >
+                <v-icon :icon="$options.icons.mdiInformationOutline"/>
+                <v-menu
+                  activator="parent"
+                  :close-on-content-click="false"
+                >
+                  <v-card class="pa-2">
+                    <v-skeleton-loader
+                      v-if="!jobNode"
+                      type="text@6"
+                    />
+                    <JobDetails
+                      v-else
+                      :node="jobNode"
+                      density="compact"
+                      hover
+                    >
+                      <template #header>
+                        {{ new Tokens(jobNode.id).relativeID }}
+                      </template>
+                    </JobDetails>
+                  </v-card>
+                </v-menu>
+              </v-btn>
+            </template>
+          </v-text-field>
           <v-text-field
             v-else
             data-cy="workflow-id-input"
@@ -79,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </v-col>
         <v-col
           cols="4"
-          class="d-flex col-gap-2"
+          class="d-flex align-start col-gap-2"
         >
           <v-select
             data-cy="file-input"
@@ -87,11 +121,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="fileDisabled"
             :items="logFiles"
             v-model="file"
-            clearable
             :menu-props="{ 'data-cy': 'file-input-menu' }"
           />
           <v-btn
-            @click="() => this.updateLogFileList(false)"
+            @click="() => this.updateLogFileList()"
             v-bind="toolbarBtnProps"
             data-cy="refresh-files"
           >
@@ -171,8 +204,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script>
-import { ref, computed } from 'vue'
-import { usePrevious, whenever } from '@vueuse/core'
+import { ref, computed, watch } from 'vue'
+import { refWithControl, usePrevious, whenever } from '@vueuse/core'
 import { useStore } from 'vuex'
 import {
   mdiClockOutline,
@@ -182,6 +215,7 @@ import {
   mdiWrap,
   mdiFileAlertOutline,
   mdiMouseMoveDown,
+  mdiInformationOutline,
 } from '@mdi/js'
 import { btnProps } from '@/utils/viewToolbar'
 import graphqlMixin from '@/mixins/graphql'
@@ -199,6 +233,11 @@ import ViewToolbar from '@/components/cylc/ViewToolbar.vue'
 import DeltasCallback from '@/services/callbacks'
 import { debounce } from 'lodash-es'
 import CopyBtn from '@/components/core/CopyBtn.vue'
+import { Alert } from '@/model/Alert.model'
+import { getJobLogFileFromState } from '@/model/JobState.model'
+import JobDetails from '@/components/cylc/common/JobDetails.vue'
+import { useLogWordWrapDefault } from '@/composables/localStorage'
+import { eventBus } from '@/services/eventBus'
 
 /**
  * Query used to retrieve data for the Log view.
@@ -230,38 +269,29 @@ query LogFiles($id: ID!) {
 `
 
 /**
+ * Query used to retrieve data on the Job.
+ *
+ * @type {DocumentNode}
+*/
+const JOB_QUERY = gql`
+query Jobs($id: ID!, $workflowId: ID!) {
+  jobs (live: false, ids: [$id], workflows: [$workflowId]) {
+    id
+    state
+    platform
+    jobId
+    jobRunnerName
+    submittedTime
+    startedTime
+    finishedTime
+  }
+}
+`
+
+/**
  * The preferred file to start with as a list of patterns.
  * The first pattern with a matching file name will be chosen.
  */
-const LOG_FILE_DEFAULTS = [
-  // job stdout
-  /^job\.out$/,
-  // job script (e.g. on job submission failure)
-  /^job$/,
-  // scheduler log (lexographical sorting ensures the latest log)
-  /^scheduler\/*/
-]
-
-/**
- * Return the default log file from the given log filenames, if there is a
- * matching filename. Relies on the filenames having been sorted in descending
- * order.
- *
- * @param {string[]} logFiles - list of available log filenames
- * @returns {?string}
- */
-export const getDefaultFile = (logFiles) => {
-  if (logFiles.length) {
-    for (const filePattern of LOG_FILE_DEFAULTS) {
-      for (const fileName of logFiles) {
-        if (filePattern.exec(fileName)) {
-          return fileName
-        }
-      }
-    }
-  }
-  return null // rather than undefined
-}
 
 class Results {
   constructor () {
@@ -320,6 +350,7 @@ export default {
     CopyBtn,
     LogComponent,
     ViewToolbar,
+    JobDetails,
   },
   emits: [
     updateInitialOptionsEvent,
@@ -327,18 +358,51 @@ export default {
 
   props: {
     initialOptions,
+    /** ID of widget if the log view is in a Lumino tab. */
+    widgetID: {
+      type: String,
+      required: false,
+      default: null,
+    },
   },
 
   setup (props, { emit }) {
     const store = useStore()
 
     /**
-     * The task/job ID input.
+     * The task/job ID.
      * @type {import('vue').Ref<string>}
      */
     const relativeID = useInitialOptions('relativeID', { props, emit })
 
     const previousRelativeID = usePrevious(relativeID)
+
+    /**
+     * The user input for task/job ID.
+     * Set the value of relativeID at most every 0.5 seconds.
+     */
+    const inputID = refWithControl(relativeID.value, {
+      onChanged: debounce((value) => {
+        relativeID.value = value
+      }, 500)
+    })
+
+    function validateInputID (id) {
+      return !id || (Tokens.validate(id, true) ?? true)
+    }
+
+    /** @type {import('vue').Ref<Tokens>} */
+    const relativeTokens = computed(() => {
+      if (relativeID.value) {
+        try {
+          const tokens = new Tokens(relativeID.value, true)
+          if (tokens.task) {
+            return tokens.job ? tokens : tokens.clone({ job: 'NN' })
+          }
+        } catch {}
+      }
+      return null
+    })
 
     /**
      * The selected log file name.
@@ -349,8 +413,12 @@ export default {
     /** Toggle timestamps in log files */
     const timestamps = useInitialOptions('timestamps', { props, emit }, true)
 
-    /** Wrap lines? */
-    const wordWrap = useInitialOptions('wordWrap', { props, emit }, false)
+    /* Wrap lines? */
+    const wordWrapDefault = useLogWordWrapDefault()
+    const wordWrap = useInitialOptions('wordWrap', { props, emit }, wordWrapDefault.value)
+    watch(wordWrap, (value) => {
+      wordWrapDefault.value = value
+    })
 
     /** The log subscription results */
     const results = ref(new Results())
@@ -369,11 +437,6 @@ export default {
       () => { results.value.connected = false }
     )
 
-    /** Set the value of relativeID at most every 0.5 seconds, used for text input */
-    const debouncedUpdateRelativeID = debounce((value) => {
-      relativeID.value = value
-    }, 500)
-
     /** AutoScroll? */
     const autoScroll = useInitialOptions('autoScroll', { props, emit }, true)
 
@@ -389,6 +452,10 @@ export default {
       parentPath,
       relativeID,
       previousRelativeID,
+      inputID,
+      validateInputID,
+      relativeTokens,
+      Tokens,
       file,
       // the label for the file input
       fileLabel: ref('Select File'),
@@ -401,9 +468,9 @@ export default {
       wordWrap,
       autoScroll,
       reset,
-      debouncedUpdateRelativeID,
       toolbarBtnSize,
       toolbarBtnProps: btnProps(toolbarBtnSize),
+      jobNode: ref(null),
     }
   },
 
@@ -411,15 +478,26 @@ export default {
     // Watch id & file together:
     this.$watch(
       () => ({
-        id: this.id ?? undefined, // (treat null as undefined)
+        id: this.id ?? undefined, // (do not trigger the callback on null ⇄ undefined)
         file: this.file ?? undefined
       }),
-      async ({ id }, old) => {
+      async ({ id, file }, old) => {
+        // update the widget tab caption when the id or file change
+        if (this.widgetID) {
+          const prefix = this.relativeID ? `${this.relativeID} – ` : ''
+          eventBus.emit(
+            `lumino:update-tab:${this.widgetID}`,
+            {
+              title: `Log: ${this.jobLog ? 'Job' : 'Workflow'}`,
+              caption: `${prefix}${file ?? 'No file selected'}`,
+            }
+          )
+        }
         // update the query when the id or file change
         this.updateQuery()
-        // refresh the file list when the id changes
+        // refresh the file & file list when the id changes
         if (id !== old?.id) {
-          await this.updateLogFileList()
+          await this.setNewFile(!old)
         }
       },
       { immediate: true }
@@ -435,15 +513,7 @@ export default {
       // the ID of the workflow/task/job we are subscribed to
       // OR null if not subscribed
       if (this.jobLog) {
-        try {
-          const taskTokens = new Tokens(this.relativeID, true)
-          if (!taskTokens?.task) {
-            return null
-          }
-          return this.workflowTokens.clone({ cycle: taskTokens.cycle, task: taskTokens.task, job: taskTokens.job }).id
-        } catch {
-          return null
-        }
+        return this.relativeTokens?.clone(this.workflowTokens)?.id
       }
       return this.workflowId
     },
@@ -505,10 +575,44 @@ export default {
         /* isGlobalCallback */ false
       )
     },
-    async updateLogFileList (reset = true) {
-      // if reset===true then the this.file will be reset
-      // otherwise it will be left alone
-
+    /**
+     * Query job data.
+     *
+     * @returns {Object|false} The job node, or false if no data/the query failed.
+     */
+    async fetchJobData () {
+      let result
+      this.jobNode = null
+      try {
+        if (this.relativeTokens) {
+          // get the latest job state
+          result = await this.$workflowService.query2(
+            JOB_QUERY,
+            {
+              id: this.relativeTokens.id,
+              workflowId: this.workflowTokens.workflow
+            }
+          )
+        }
+      } catch (err) {
+        // the query failed
+        console.error(err)
+        return false
+      }
+      this.jobNode = result?.data?.jobs?.[0] ?? false
+      return this.jobNode
+    },
+    /**
+     * Get the default workflow log file from the given log filenames, if there is a
+     * matching filename. Relies on the filenames having been sorted in descending
+     * order.
+     *
+     * @returns {?string}
+     */
+    getDefaultWorkflowLog () {
+      return this.logFiles.find((fileName) => fileName.startsWith('scheduler/'))
+    },
+    async updateLogFileList () {
       if (!this.id) {
         this.handleNoLogFiles()
         return
@@ -525,7 +629,7 @@ export default {
         })
       } catch (err) {
         // the query failed
-        console.warn(err)
+        this.handleLogFileListingErr(err)
         this.handleNoLogFiles()
         return
       }
@@ -537,30 +641,46 @@ export default {
 
       const logFiles = result.data.logFiles?.files ?? []
 
-      // reset the file if it is not present in the new selection
-      if (reset) {
-        if (this.file && !logFiles.includes(this.file)) {
-          this.file = null
-        }
-        if (!this.file) {
-        // set the default log file if appropriate
-          this.file = getDefaultFile(logFiles)
-        }
-      }
-
       // update the file input
       if (logFiles.length) {
         this.fileLabel = 'Select File'
         this.fileDisabled = false
         this.logFiles = logFiles
       } else {
+        if (result.errors?.length) {
+          this.handleLogFileListingErr(result.errors[0].message)
+        }
         this.handleNoLogFiles()
+      }
+    },
+    /**
+     * Set the appropriate workflow or job log file.
+     *
+     * @param {boolean} initialLoad - is this the initial load of the log view?
+     */
+    async setNewFile (initialLoad) {
+      const promises = [this.updateLogFileList()]
+      if (this.jobLog && !initialLoad) {
+        // (Don't query job state on initial load, as it will either be pre-populated or empty)
+        promises.push(
+          this.fetchJobData().then((result) => {
+            this.file = getJobLogFileFromState(result?.state)
+          })
+        )
+      }
+      // Simultaneously wait for the log file list and the job state result
+      await Promise.all(promises)
+      if (!this.jobLog) {
+        this.file = this.getDefaultWorkflowLog()
       }
     },
     handleNoLogFiles () {
       this.fileLabel = this.id ? `No log files for ${this.id}` : 'Enter a task/job ID'
       this.fileDisabled = true
       this.logFiles = []
+    },
+    handleLogFileListingErr (err) {
+      this.$store.dispatch('setAlert', new Alert(err, 'error'))
     },
   },
 
@@ -578,7 +698,8 @@ export default {
     mdiFolderRefresh,
     mdiPowerPlug,
     mdiPowerPlugOff,
-    mdiFileAlertOutline
+    mdiFileAlertOutline,
+    mdiInformationOutline,
   }
 }
 </script>

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <Teleport
     v-if="sortInputTeleportTarget"
-    :to="`#${sortInputTeleportTarget}`"
+    :to="sortInputTeleportTarget"
   >
     <div class="d-flex flex-grow-1 col-gap-1">
       <v-autocomplete
@@ -31,16 +31,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="displayedTasks"
         label="Select tasks"
         ref="selectTasks"
+        data-cy="time-series-task-select"
       >
         <template v-slot:prepend-item>
-          <v-card-actions class="mt-n2">
+          <v-select-actions>
             <v-btn @click="selectSearchResults">
               Select all
             </v-btn>
             <v-btn @click="deselectSearchResults">
               Deselect all
             </v-btn>
-          </v-card-actions>
+          </v-select-actions>
           <v-divider/>
         </template>
       </v-autocomplete>
@@ -200,7 +201,7 @@ export default {
     },
     /** Where to teleport the sorting input (or don't render if null) */
     sortInputTeleportTarget: {
-      type: String,
+      type: HTMLElement,
       default: null,
     },
   },
@@ -366,7 +367,7 @@ export default {
               if (!value) {
                 return null
               }
-              const y = formatDuration(value, true)
+              const y = formatDuration(value, { allowZeros: true })
               const platform = this.series[seriesIndex].data[dataPointIndex].platform
               return `${y} (${platform})`
             }
@@ -387,9 +388,7 @@ export default {
             text: upperFirst(this.timingOption) + ' time',
           },
           labels: {
-            formatter: function (value) {
-              return formatDuration(value, true)
-            }
+            formatter: (value) => formatDuration(value, { allowZeros: true })
           },
         },
       }
@@ -448,9 +447,7 @@ export default {
             text: upperFirst(this.timingOption) + ' time',
           },
           labels: {
-            formatter: function (value) {
-              return formatDuration(value, true)
-            }
+            formatter: (value) => formatDuration(value, { allowZeros: true })
           },
           min: this.showOrigin ? 0 : undefined
         },

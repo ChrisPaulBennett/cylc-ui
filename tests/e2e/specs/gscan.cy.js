@@ -20,6 +20,21 @@ describe('GScan component', () => {
     cy.visit('/#/')
   })
 
+  it('shows mutations menu when clicking on workflow icon', () => {
+    cy.get('.c-gscan-workflows')
+      .find('.c-treeitem [data-c-interactive]:first')
+      .click()
+      .get('.c-mutation-menu')
+      .should('be.visible')
+      .find('.v-card-title')
+      .should(($el) => {
+        expect($el.text().trim()).to.equal('one')
+      })
+      .get('.c-mutation-menu-list:first')
+      .children()
+      .should('have.length.greaterThan', 2)
+  })
+
   describe('Filtering', () => {
     beforeEach(() => {
       // should show all workflows by default
@@ -91,7 +106,7 @@ describe('GScan component', () => {
       cy.get('[data-cy="filter task state"]')
         .click()
         .get('.v-select__content')
-        .contains('.v-list-item', 'succeed')
+        .contains('.v-list-item', 'succeeded')
         .click({ force: true })
       cy.get('.c-treeitem:visible')
         .should('have.length', 1)
@@ -156,18 +171,65 @@ describe('GScan component', () => {
     })
   })
 
-  it('shows mutations menu when clicking on workflow icon', () => {
-    cy.get('.c-gscan-workflows')
-      .find('.c-treeitem [data-c-interactive]:first')
-      .click()
-      .get('.c-mutation-menu')
-      .should('be.visible')
-      .find('.v-card-title')
-      .should(($el) => {
-        expect($el.text().trim()).to.equal('one')
-      })
-      .get('.c-mutation-menu-list:first')
-      .children()
-      .should('have.length.greaterThan', 2)
+  describe('Task state badges', () => {
+    it('collates task states up the tree', () => {
+      cy.get('.c-gscan')
+        .find('[data-node-name="other/multi"]').as('parent')
+        .find('.node:first .task-state-badge')
+        .should('have.length', 1)
+        .should('have.class', 'running')
+        .contains('3')
+      // child run2 contributes the running tasks
+      cy.get('@parent').find('[data-node-name="run2"] .task-state-badge')
+        .should('have.length', 1)
+        .should('have.class', 'running')
+        .contains('3')
+      // but child run1 is stopped and so doesn't contribute
+      cy.get('@parent').find('[data-node-name="run1"] .task-state-badge')
+        .should('have.length', 1)
+        .should('have.class', 'failed')
+        .contains('1')
+    })
+  })
+
+  describe('Warnings', () => {
+    it('collates warnings up the tree', () => {
+      // NOTE: Log events may be duplicated in offline-mode due to the way the
+      // mock data is loaded. This does not apply to production.
+
+      // id="other/muti/run2" type="workflow"
+      cy.get('[data-node-name="run2"] .c-warn:first')
+        .should('have.class', 'active') // warning active
+        .find('svg')
+        .trigger('mouseenter')
+        .invoke('attr', 'aria-describedby').then((tooltipid) => {
+          cy.get(`#${tooltipid} .v-overlay__content`)
+            .should('contain', 'ERROR')
+            .and('contain', 'SOS')
+        })
+
+      // id="other/muti" type="workflow-part"
+      cy.get('[data-node-name="other/multi"] .c-warn:first')
+        .should('have.class', 'active') // warning has bubbled up from run2
+        .find('svg')
+        .trigger('mouseenter')
+        .invoke('attr', 'aria-describedby').then((tooltipid) => {
+          cy.get(`#${tooltipid} .v-overlay__content`)
+            .should('contain', 'ERROR')
+            .and('contain', 'SOS')
+        })
+
+      // dismiss the warning
+      cy.get('[data-node-name="run2"] .c-warn:first svg')
+        .click({ force: true })
+
+      // id="other/muti/run2" type="workflow"
+      cy.get('[data-node-name="run2"] .c-warn:first')
+        .should('not.have.class', 'active') // warning dismissed
+
+      // id="other/muti" type="workflow-part"
+      cy.get('[data-node-name="other/multi"] .c-warn:first')
+        .should('not.have.class', 'active') // warning dismissed
+    })
   })
 })

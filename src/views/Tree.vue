@@ -187,11 +187,17 @@ fragment TaskProxyData on TaskProxy {
   isHeld
   isQueued
   isRunahead
+  isRetry
+  isWallclock
+  isXtriggered
   task {
     meanElapsedTime
   }
   firstParent {
     id
+  }
+  runtime {
+    runMode
   }
   flowNums
 }
@@ -204,6 +210,7 @@ fragment JobData on Job {
   startedTime
   submittedTime
   finishedTime
+  estimatedFinishTime
   state
   submitNum
   messages

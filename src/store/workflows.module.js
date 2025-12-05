@@ -124,7 +124,7 @@ function getIndex (state, id) {
   return state.cylcTree.$index[id]
 }
 
-/* Add a child node under a parent Node */
+/** Add a child node under a parent Node */
 function addChild (parentNode, childNode) {
   // determine which list to add this node to
   // console.log(`$t ++ ${childNode.id}`)
@@ -144,20 +144,14 @@ function addChild (parentNode, childNode) {
   }
 
   // insert the child preserving sort order
-  let comparator
-  if (['cycle', 'family'].includes(parentNode.type)) {
-    // sort by type, then name
-    // (this makes families sort before tasks in the graph)
-    comparator = (n) => `${n.type}-${n.name}`
-  } else {
-    // sort by name
-    comparator = (n) => n.name
-  }
+  const iteratee = ['task', 'family'].includes(childNode.type)
+    ? (n) => `${n.type}-${n.name}` // (this makes families sort before tasks in the tree)
+    : (n) => n.name
   const reverse = ['cycle', 'job'].includes(childNode.type)
   const index = sortedIndexBy(
     parentNode[key],
     childNode,
-    comparator,
+    iteratee,
     { reverse }
   )
   parentNode[key].splice(index, 0, childNode)
@@ -269,6 +263,77 @@ function applyInheritance (state, node) {
   }
 }
 
+/**
+ * Collate node state up / down the tree.
+ *
+ * This handles updates to one node that might affect another, allowing updates
+ * to propagate up or down the tree.
+ *
+ * This currently manages the following fields:
+ *   - logRecords
+ *   - warningActive
+ *
+ * The purge argument can be used to strip already actioned keys from the
+ * update object. This needs to be done if the update is assigned to the node
+ * after this call.
+ */
+function collateState (state, node, update, newlyCreated) {
+  // bubble state up the tree
+  if (node.type === 'workflow' && update.logRecords?.length) {
+    let parent = node
+    if (newlyCreated) {
+      parent.node.warningActive = true
+      parent = state.cylcTree.$index[parent.parent]
+    }
+    // walk up the tree
+    while (['workflow', 'workflow-part'].includes(parent.type)) {
+      parent.node.warningActive = true
+      deque(parent.node, 'logRecords', update.logRecords, 10)
+      parent = state.cylcTree.$index[parent.parent]
+    }
+  }
+
+  // push state down the tree
+  if (node.type === 'workflow-part' && (update.warningActive !== undefined)) {
+    const stack = [node]
+    let child
+    while (stack.length) {
+      child = stack.pop()
+      if (child.type === 'workflow') {
+        child.node.warningActive = update.warningActive
+      } else if (child.type === 'workflow-part') {
+        child.node.warningActive = update.warningActive
+        stack.push(...child.children)
+      }
+    }
+  }
+
+  // bubble state up the tree (resulting from a push down the tree? - move
+  // inside last block?)
+  if (['workflow', 'workflow-part'].includes(node.type) && update.warningActive === false) {
+    let parent = node
+    while (['workflow', 'workflow-part'].includes(parent.type)) {
+      parent = state.cylcTree.$index[parent.parent]
+      if (parent.node.warningActive) {
+        let warningActive = false
+        for (const child of parent.children) {
+          if (child.id !== node.id && child.node.warningActive) {
+            warningActive = true
+            break
+          }
+        }
+        parent.node.warningActive = warningActive
+      }
+    }
+  }
+
+  if (!newlyCreated) {
+    // these fields are managed exclusively by this routine, don't let them
+    // pass through to be erroneously updated by the standard method
+    delete update.logRecords
+  }
+}
+
 /* Add or update data in the store.
  *
  * UpdatedData must have an ID. This will create a node if it does not exist
@@ -283,6 +348,7 @@ function update (state, updatedData) {
   let treeItem = getIndex(state, id)
   if (treeItem) {
     // node already exists -> update it
+    collateState(state, treeItem, updatedData, false)
     Object.assign(treeItem.node, updatedData)
     applyInheritance(state, treeItem)
     return
@@ -298,6 +364,7 @@ function update (state, updatedData) {
 
   // add an entry for this item into the index
   addIndex(state, id, treeItem)
+  collateState(state, treeItem, updatedData, true)
 }
 
 /* Return the family hierarchy leading to a node.
@@ -335,6 +402,17 @@ function getFamilyTree (tokens, node) {
   ])
 
   return ret
+}
+
+/* Update a rolling array, adding new items and removing old ones.
+ */
+function deque (node, key, values, maxLength) {
+  const old = node[key]
+  if (old?.length === undefined) {
+    node[key] = values
+  } else {
+    node[key] = old.concat(values).splice(-1 * maxLength)
+  }
 }
 
 /* Create a node for insertion into the tree.
