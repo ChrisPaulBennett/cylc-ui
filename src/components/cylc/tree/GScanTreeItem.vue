@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :auto-expand-types="nodeTypes"
     :render-expand-collapse-btn="node.type !== 'workflow'"
     ref="treeItem"
+    :class="{compact: compactMode}"
   >
     <WorkflowIcon
       v-if="node.type === 'workflow'"
@@ -33,20 +34,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :to="workflowLink"
       :class="nodeClass"
       class="flex-grow-1 flex-shrink-1 px-2 ml-1"
+      :density="compactMode ? 'compact' : 'comfortable'"
     >
       <div class="d-flex align-center align-content-center flex-nowrap">
         <div class="c-gscan-workflow-name flex-grow-1">
           <span>
             {{ node.name || node.id }}
-            <v-tooltip
-              location="top"
-              style="overflow-wrap: anywhere;"
-            >
+            <v-tooltip style="overflow-wrap: anywhere;">
               {{ node.id }}
             </v-tooltip>
           </span>
         </div>
-        <div class="d-flex c-gscan-workflow-states flex-grow-0">
+        <div class="d-flex c-gscan-workflow-states flex-grow-0 align-center">
+          <v-icon
+            v-for="modifier in statesInfo.modifiers"
+            :key="modifier"
+            :icon="modifierIcons[modifier]"
+            v-tooltip="`Has ${modifier} tasks.`"
+            size="1em"
+            class="modifier-badge"
+            :class="modifier"
+          />
           <TaskStateBadge
             v-for="(value, state) in statesInfo.stateTotals"
             :key="state"
@@ -84,7 +92,8 @@ import TreeItem from '@/components/cylc/tree/TreeItem.vue'
 import WarningIcon from '@/components/cylc/WarningIcon.vue'
 import TaskState from '@/model/TaskState.model'
 import { WorkflowState } from '@/model/WorkflowState.model'
-import { useWorkflowWarnings } from '@/composables/localStorage'
+import { taskHeld, taskRetry } from '@/utils/icons'
+import { useCompactMode, useWorkflowWarnings } from '@/composables/localStorage'
 
 const nodeTypes = ['workflow-part', 'workflow']
 
@@ -96,6 +105,11 @@ const taskStatesOrdered = [
   TaskState.RUNNING.name,
 ]
 
+const modifierIcons = {
+  held: taskHeld,
+  retrying: taskRetry,
+}
+
 /**
  * Get aggregated task state totals for all descendents of a node.
  *
@@ -103,19 +117,27 @@ const taskStatesOrdered = [
  *
  * @param {Object} node
  * @param {Record<string, number>} stateTotals - Accumulator for state totals.
+ * @param {Set<string>} modifiers - Accumulator for modifier states.
  */
-function getStatesInfo (node, stateTotals = {}) {
+function getStatesInfo (node, stateTotals = {}, modifiers = new Set()) {
   const latestTasks = {}
   // if we aren't at the end of the node tree, continue recurse until we hit something other then a workflow part
   if (node.type === 'workflow-part' && node.children) {
     // at every branch, recurse all child nodes except stopped workflows
     for (const child of node.children) {
       if (child.node.status !== WorkflowState.STOPPED.name) {
-        getStatesInfo(child, stateTotals, latestTasks)
+        getStatesInfo(child, stateTotals, modifiers)
       }
     }
   } else if (node.type === 'workflow' && node.node.stateTotals) {
     // if we hit a workflow node, stop and merge state
+
+    if (node.node.containsHeld) {
+      modifiers.add('held')
+    }
+    if (node.node.containsRetry) {
+      modifiers.add('retrying')
+    }
 
     // the non-zero state totals from this node with all the others from the tree
     for (const state of taskStatesOrdered) {
@@ -136,10 +158,12 @@ function getStatesInfo (node, stateTotals = {}) {
       }
     }
   }
-  return { stateTotals, latestTasks }
+  return { stateTotals, latestTasks, modifiers }
 }
 
 const workflowWarnings = useWorkflowWarnings()
+
+const compactMode = useCompactMode()
 
 const props = defineProps({
   node: {

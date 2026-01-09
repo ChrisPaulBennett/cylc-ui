@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <v-col>
         <!-- TODO: this is not really an alert, it's a heading -->
         <v-alert
-          :icon="$options.icons.mdiTable"
+          :icon="icons.mdiTable"
           prominent
           color="grey-lighten-3"
         >
@@ -34,39 +34,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <v-data-table
           :headers="$options.headers"
           :items="workflowsTable"
+          hover
           data-cy="workflows-table"
           style="font-size: 1rem;"
         >
-          <template v-slot:item="{ item }">
-            <tr
-              @click="viewWorkflow(item)"
-              style="cursor: pointer"
+          <template #item="{ props, item }">
+            <v-defaults-provider
+              :defaults="{
+                VTooltip: {
+                  openDelay: 200,
+                },
+              }"
             >
-              <td width="1em">
-                <WorkflowIcon
-                  :status="item.node.status"
-                  v-command-menu="item"
-                />
-              </td>
-              <td>
-                {{ item.tokens.workflow }}
-              </td>
-              <td>
-                {{ item.node.status }}
-              </td>
-              <td>
-                {{ item.node.cylcVersion }}
-              </td>
-              <td>
-                {{ item.node.owner }}
-              </td>
-              <td>
-                {{ item.node.host }}
-              </td>
-              <td>
-                {{ item.node.port }}
-              </td>
-            </tr>
+              <v-data-table-row
+                v-bind="props"
+                @click="viewWorkflow(item)"
+                class="cursor-pointer"
+              >
+                <template #item.icon="{ item }">
+                  <WorkflowIcon
+                    :status="item.node.status"
+                    v-command-menu="item"
+                  />
+                </template>
+                <template #item.node.lastUpdated="{ value }">
+                  <span v-if="value">
+                    {{ formatDatetime(new Date(value * 1000)) }}
+                    <v-tooltip>
+                      {{ displayLastUpdate(value, now) }}
+                    </v-tooltip>
+                  </span>
+                </template>
+              </v-data-table-row>
+            </v-defaults-provider>
           </template>
         </v-data-table>
       </v-col>
@@ -82,6 +82,7 @@ import SubscriptionQuery from '@/model/SubscriptionQuery.model'
 import subscriptionComponentMixin from '@/mixins/subscriptionComponent'
 import WorkflowIcon from '@/components/cylc/gscan/WorkflowIcon.vue'
 import gql from 'graphql-tag'
+import { formatDatetime, humanDuration } from '@/utils/datetime'
 
 const QUERY = gql`
 subscription Workflow {
@@ -110,6 +111,7 @@ fragment WorkflowData on Workflow {
   owner
   host
   port
+  lastUpdated
 }
 `
 
@@ -124,6 +126,15 @@ export default {
     WorkflowIcon
   },
 
+  setup () {
+    return {
+      formatDatetime,
+      icons: {
+        mdiTable,
+      },
+    }
+  },
+
   data: () => ({
     query: new SubscriptionQuery(
       QUERY,
@@ -133,7 +144,17 @@ export default {
       true,
       true
     ),
+    now: null,
   }),
+
+  mounted () {
+    this.updateDate()
+    this.interval = setInterval(this.updateDate, 5000) // 5 second update interval
+  },
+
+  beforeUnmount () {
+    clearInterval(this.interval)
+  },
 
   computed: {
     ...mapState('workflows', ['cylcTree']),
@@ -149,6 +170,16 @@ export default {
   methods: {
     viewWorkflow (workflow) {
       this.$router.push({ path: `/workspace/${workflow.tokens.workflow}` })
+    },
+    updateDate () {
+      this.now = new Date()
+    },
+    displayLastUpdate (timestamp, now) {
+      // NOTE: "now" is provided for reactivity purposes
+      // (it ensures this field gets updated)
+      if (timestamp) {
+        return humanDuration(new Date(timestamp * 1000))
+      }
     }
   },
 
@@ -188,10 +219,11 @@ export default {
       title: i18n.global.t('Workflows.tableColumnPort'),
       key: 'node.port'
     },
+    {
+      sortable: true,
+      title: 'Last Activity',
+      key: 'node.lastUpdated'
+    },
   ],
-
-  icons: {
-    mdiTable,
-  },
 }
 </script>
