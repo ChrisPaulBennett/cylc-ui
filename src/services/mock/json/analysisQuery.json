@@ -20,11 +20,11 @@
           "minQueueTime": 9,
           "queueQuartiles": [10, 11, 13],
           "maxQueueTime": 14,
-          "maxPeakRss": 20000000,
-          "meanPeakRss": 10000000,
+          "maxPeakRss": 20,
+          "meanPeakRss": 10,
           "stdDevPeakRss": 5,
-          "minPeakRss": 5000000,
-          "peakRssQuartiles": [5500000, 10000000, 15000000],
+          "minPeakRss": 5,
+          "peakRssQuartiles": [5.5, 10, 15],
           "maxCpuTime": 30000,
           "meanCpuTime": 20000,
           "stdDevCpuTime": 5,
@@ -32,7 +32,7 @@
           "totalCpuTime": 200000,
           "cpuTimeQuartiles": [10000, 20000, 30000],
           "totalOfTotals": 420000,
-          "memAlloc": 1073741824
+          "memAlloc": 25
         },
         {
           "name": "eventually_succeeded",
@@ -53,11 +53,11 @@
           "minQueueTime": 8,
           "queueQuartiles": [9, 10, 11],
           "maxQueueTime": 11,
-          "maxPeakRss": 30000000,
-          "meanPeakRss": 20000000,
+          "maxPeakRss": 30,
+          "meanPeakRss": 20,
           "stdDevPeakRss": 5,
-          "minPeakRss": 6000000,
-          "peakRssQuartiles": [6600000, 20000000, 25000000],
+          "minPeakRss": 6,
+          "peakRssQuartiles": [6.6, 20, 25],
           "maxCpuTime": 20000,
           "meanCpuTime": 10000,
           "stdDevCpuTime": 5,
@@ -65,7 +65,7 @@
           "totalCpuTime": 200000,
           "cpuTimeQuartiles": [10000, 11000, 13000],
           "totalOfTotals": 420000,
-          "memAlloc": 1073741824
+          "memAlloc": 35
         },
         {
           "name": "waiting",
@@ -86,11 +86,11 @@
           "minQueueTime": 10,
           "queueQuartiles": [10, 12, 13],
           "maxQueueTime": 14,
-          "maxPeakRss": 40000000,
-          "meanPeakRss": 30000000,
+          "maxPeakRss": 40,
+          "meanPeakRss": 30,
           "stdDevPeakRss": 5,
-          "minPeakRss": 7000000,
-          "peakRssQuartiles": [7700000, 30000000, 35000000],
+          "minPeakRss": 7,
+          "peakRssQuartiles": [7.7, 30, 35],
           "maxCpuTime": 30000,
           "meanCpuTime": 20000,
           "stdDevCpuTime": 5,
@@ -98,7 +98,7 @@
           "totalCpuTime": 200000,
           "cpuTimeQuartiles": [10000, 11000, 13000],
           "totalOfTotals": 420000,
-          "memAlloc": 1073741824
+          "memAlloc": 45
         }
       ]
     }
@@ -114,7 +114,7 @@
           "queueTime": 2,
           "runTime": 58,
           "startedTime": "2023-01-01T00:00:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         },
         {
@@ -125,7 +125,7 @@
           "queueTime": 2,
           "runTime": 59,
           "startedTime": "2023-01-01T01:00:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         },
         {
@@ -136,7 +136,7 @@
           "queueTime": 2,
           "runTime": 60,
           "startedTime": "2023-01-01T02:00:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         },
         {
@@ -147,7 +147,7 @@
           "queueTime": 2,
           "runTime": 39,
           "startedTime": "2023-01-01T01:00:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         },
         {
@@ -158,7 +158,7 @@
           "queueTime": 2,
           "runTime": 38,
           "startedTime": "2023-01-01T00:00:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         },
         {
@@ -169,7 +169,7 @@
           "queueTime": 2,
           "runTime": 40,
           "startedTime": "2023-01-01T02:00:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         },
         {
@@ -180,7 +180,7 @@
           "queueTime": 2,
           "runTime": 48,
           "startedTime": "2023-01-01T00:00:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         },
         {
@@ -191,7 +191,7 @@
           "queueTime": 2,
           "runTime": 2,
           "startedTime": "2023-01-01T02:01:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         },
         {
@@ -202,7 +202,7 @@
           "queueTime": 2,
           "runTime": 50,
           "startedTime": "2023-01-01T02:02:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         },
         {
@@ -213,7 +213,7 @@
           "queueTime": 2,
           "runTime": 1,
           "startedTime": "2023-01-01T02:00:00Z",
-          "peakRss": 1000,
+          "peakRss": 500,
           "cpuTime": 50000
         }
       ]

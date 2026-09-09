@@ -135,17 +135,17 @@ export function formatDuration (value, allowZeros = false, timingOption = true) 
 }
 
 function formatRSS (value) {
-  // Format the peak RSS value in a human-readable format
+  // Format the peak RSS value in a human-readable format.
+  // The value is provided in megabytes (MB).
   if (value === undefined || value === null) {
     return undefined
-  } else if (value / 1024 < 1000) {
-    const kilobytes = value / 1024
+  } else if (value < 1) {
+    const kilobytes = value * 1024
     return kilobytes.toPrecision(3) + ' KB'
-  } else if (value / 1048576 < 1000) {
-    const megabytes = value / 1048576
-    return megabytes.toPrecision(3) + ' MB'
+  } else if (value < 1000) {
+    return value.toPrecision(3) + ' MB'
   } else {
-    const gigabytes = value / 1073741824
+    const gigabytes = value / 1024
     return gigabytes.toPrecision(3) + ' GB'
   }
 }
