@@ -136,7 +136,7 @@ export function formatDuration (value, allowZeros = false, timingOption = true) 
 
 function formatRSS (value) {
   // Format the peak RSS value in a human-readable format.
-  // The value is provided in megabytes (MB).
+  // The value is provided in mebibytes (MiB).
   if (value === undefined || value === null) {
     return undefined
   } else if (value < 1) {
