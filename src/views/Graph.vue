@@ -454,11 +454,12 @@ export default {
       // turn the timer on or off depending on the value of autoRefresh
       // if initialLoad is true we want to set a refresh interval
       // regardless of autoRefresh state.
+      // (always clear any existing timer first, otherwise it would keep
+      // running, even after the view is closed)
+      clearInterval(this.refreshTimer)
+      this.refreshTimer = null
       if (this.autoRefresh || this.initialLoad) {
         this.refreshTimer = setInterval(this.refresh, 2000)
-      } else {
-        clearInterval(this.refreshTimer)
-        this.refreshTimer = null
       }
     },
     increaseSpacing () {
@@ -679,9 +680,9 @@ export default {
       // wipe old graph edges
       this.graphEdges = [] // wipe old graph edges
       // wipe old node transformations
-      const nodeIds = nodes.map((n) => n.id)
+      const nodeIds = new Set(nodes.map((n) => n.id))
       for (const id in this.nodeTransformations) {
-        if (!nodeIds.includes(id)) { // this node has been removed
+        if (!nodeIds.has(id)) { // this node has been removed
           delete this.nodeTransformations[id]
         }
       }
@@ -706,6 +707,10 @@ export default {
       if (nodeDimensions) {
         if (this.initialLoad) { this.initialLoad = false }
       } else {
+        // nodes not rendered yet, allow the layout to retry later
+        // (note: we must reset `updating`, otherwise all future refreshes
+        // would be skipped)
+        this.updating = false
         return
       }
 
