@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="`${customOutput.label}-${index}`"
                   :class="customOutput.isMessage ? 'bg-light-grey text-black' : 'bg-grey text-white'"
                   class="message-output"
-                  v-tooltip="customOutput.isMessage ? `Task message: ${customOutput.message}` : customOutput.message"
+                  v-lazy-tooltip="customOutput.isMessage ? `Task message: ${customOutput.message}` : customOutput.message"
                 >
                   {{ customOutput.isMessage ? customOutput.message : customOutput.label }}
                 </v-chip>
@@ -183,6 +183,7 @@ import { getIndent, getNodeChildren } from '@/components/cylc/tree/util'
 import { once } from '@/utils/reactivity'
 import { useToggle } from '@vueuse/core'
 import FlowNumsChip from '@/components/cylc/common/FlowNumsChip.vue'
+import { LazyTooltip } from '@/utils/lazyTooltip'
 
 export default {
   name: 'TreeItem',
@@ -192,6 +193,10 @@ export default {
     Task,
     Job,
     JobLeaf,
+  },
+
+  directives: {
+    LazyTooltip,
   },
 
   props: {

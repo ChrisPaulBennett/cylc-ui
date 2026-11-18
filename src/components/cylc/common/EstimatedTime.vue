@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </template>
   <span
     v-else-if="isTruthyOrZero(estimate)"
-    v-tooltip="{ text: tooltip, openDelay: 200 }"
+    v-lazy-tooltip="{ text: tooltip, openDelay: 200 }"
     class="d-inline-flex align-center text-blue-grey"
   >
     {{ formatter(estimate) }}
@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup>
 import { mdiTimerSand } from '@mdi/js'
 import { isTruthyOrZero } from '@/utils/tasks'
+import { LazyTooltip as vLazyTooltip } from '@/utils/lazyTooltip'
 
 defineProps({
   actual: {
